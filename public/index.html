@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Sistema Premium de Gestão de Academia</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <aside class="sidebar">
+        <div class="brand">
+          <span class="brand-badge">SP</span>
+          <div>
+            <strong>Sistema Premium</strong>
+            <p>Gestão de Academia</p>
+          </div>
+        </div>
+        <nav id="sidebar-menu" class="menu"></nav>
+      </aside>
+
+      <main class="content">
+        <header class="topbar">
+          <div>
+            <p class="eyebrow">Demo executável</p>
+            <h1 id="page-title">Carregando...</h1>
+          </div>
+          <div class="topbar-actions">
+            <a class="button ghost" href="/api/system" target="_blank" rel="noreferrer">Ver API JSON</a>
+            <button id="refresh-button" class="button primary">Atualizar dados</button>
+          </div>
+        </header>
+
+        <section class="hero-card">
+          <div>
+            <span class="hero-tag">Sistema comercial</span>
+            <h2 id="module-title">Carregando módulo...</h2>
+            <p id="module-subtitle"></p>
+          </div>
+          <div class="hero-note">
+            <strong>Incluso nesta demo</strong>
+            <ul id="integration-list"></ul>
+          </div>
+        </section>
+
+        <section id="highlights-grid" class="highlights-grid"></section>
+
+        <section id="module-lists" class="list-grid"></section>
+      </main>
+    </div>
+
+    <script src="/app.js"></script>
+  </body>
+</html>

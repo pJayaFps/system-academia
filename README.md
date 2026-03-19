@@ -36,3 +36,28 @@ Este repositório descreve e estrutura um produto completo com:
 2. Use `prisma/schema.prisma` como ponto de partida do banco.
 3. Use os contratos em `apps/api` e `apps/web` para iniciar a implementação técnica.
 4. Evolua cada módulo com testes, observabilidade e deploy automatizado.
+
+
+## Executando a demo localmente
+
+Como o repositório agora possui uma demo executável sem dependências externas, você pode visualizar o sistema assim:
+
+```bash
+npm run dev
+```
+
+Depois, abra no navegador:
+
+```text
+http://localhost:3000
+```
+
+### Endpoints úteis da demo
+
+- `GET /api/health`
+- `GET /api/system`
+- `GET /api/dashboard`
+
+### Observação
+
+Esta demo é uma **visualização executável** da arquitetura e do menu obrigatório. Ela não substitui a implementação completa em React + Vite + Tailwind + Zustand + Prisma, mas permite navegar e validar o conceito imediatamente.

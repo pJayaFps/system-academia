@@ -1,0 +1,10 @@
+{
+  "name": "system-academia-demo",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Demo executável do Sistema Premium de Gestão de Academia",
+  "scripts": {
+    "dev": "node server.js",
+    "start": "node server.js"
+  }
+}
