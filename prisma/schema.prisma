@@ -1,0 +1,671 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserStatus {
+  ACTIVE
+  BLOCKED
+  INVITED
+  DISABLED
+}
+
+enum StudentStatus {
+  LEAD
+  ACTIVE
+  OVERDUE
+  INACTIVE
+  CANCELLED
+}
+
+enum MembershipStatus {
+  PENDING
+  ACTIVE
+  PAUSED
+  OVERDUE
+  CANCELLED
+  EXPIRED
+}
+
+enum PaymentMethod {
+  PIX
+  BOLETO
+  CARD
+  CASH
+  TRANSFER
+}
+
+enum FinancialEntryType {
+  INCOME
+  EXPENSE
+}
+
+enum FinancialStatus {
+  PENDING
+  PAID
+  OVERDUE
+  CANCELLED
+  REFUNDED
+}
+
+enum AttendanceSource {
+  MANUAL
+  FACIAL
+  TURNSTILE
+  APP
+}
+
+enum DeviceType {
+  TURNSTILE
+  CAMERA
+  FACIAL_TERMINAL
+  POS
+  PRINTER
+}
+
+enum DeviceStatus {
+  ONLINE
+  OFFLINE
+  MAINTENANCE
+}
+
+enum ExerciseLevel {
+  BEGINNER
+  INTERMEDIATE
+  ADVANCED
+}
+
+enum WorkoutGoal {
+  HYPERTROPHY
+  WEIGHT_LOSS
+  BEGINNER
+  CONDITIONING
+  REHABILITATION
+  PERFORMANCE
+}
+
+enum SaleOrderStatus {
+  OPEN
+  PAID
+  CANCELLED
+  REFUNDED
+}
+
+enum NotificationChannel {
+  WHATSAPP
+  EMAIL
+  PUSH
+  SMS
+}
+
+enum AuditSeverity {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+model Gym {
+  id                String          @id @default(cuid())
+  name              String
+  tradeName         String?
+  document          String?
+  email             String?
+  phone             String?
+  timezone          String          @default("America/Sao_Paulo")
+  currency          String          @default("BRL")
+  logoUrl           String?
+  settings          Json?
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+  units             GymUnit[]
+  users             User[]
+  roles             Role[]
+  students          Student[]
+  plans             Plan[]
+  products          Product[]
+  devices           Device[]
+  auditLogs         AuditLog[]
+  financialEntries  FinancialEntry[]
+  notifications     NotificationLog[]
+}
+
+model GymUnit {
+  id               String             @id @default(cuid())
+  gymId            String
+  name             String
+  code             String             @unique
+  email            String?
+  phone            String?
+  city             String?
+  state            String?
+  address          String?
+  isHeadquarter    Boolean            @default(false)
+  createdAt        DateTime           @default(now())
+  updatedAt        DateTime           @updatedAt
+  gym              Gym                @relation(fields: [gymId], references: [id])
+  users            User[]
+  students         Student[]
+  memberships      Membership[]
+  attendance       AttendanceRecord[]
+  devices          Device[]
+  salesOrders      SaleOrder[]
+  financialEntries FinancialEntry[]
+
+  @@index([gymId])
+}
+
+model User {
+  id                String             @id @default(cuid())
+  gymId             String
+  unitId            String?
+  roleId            String
+  firstName         String
+  lastName          String
+  email             String             @unique
+  phone             String?
+  passwordHash      String
+  status            UserStatus         @default(ACTIVE)
+  lastLoginAt       DateTime?
+  failedLoginCount  Int                @default(0)
+  mustResetPassword Boolean            @default(false)
+  metadata          Json?
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+  gym               Gym                @relation(fields: [gymId], references: [id])
+  unit              GymUnit?           @relation(fields: [unitId], references: [id])
+  role              Role               @relation(fields: [roleId], references: [id])
+  refreshTokens     RefreshToken[]
+  workoutPlans      WorkoutPlan[]      @relation("WorkoutCoach")
+  nutritionPlans    NutritionPlan[]    @relation("NutritionOwner")
+  salesOrders       SaleOrder[]        @relation("SalesSeller")
+  auditLogs         AuditLog[]         @relation("AuditActor")
+
+  @@index([gymId, unitId])
+}
+
+model Role {
+  id          String           @id @default(cuid())
+  gymId       String
+  name        String
+  code        String
+  description String?
+  isSystem    Boolean          @default(false)
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+  gym         Gym              @relation(fields: [gymId], references: [id])
+  users       User[]
+  permissions RolePermission[]
+
+  @@unique([gymId, code])
+}
+
+model Permission {
+  id          String           @id @default(cuid())
+  resource    String
+  action      String
+  description String?
+  roles       RolePermission[]
+
+  @@unique([resource, action])
+}
+
+model RolePermission {
+  roleId       String
+  permissionId String
+  createdAt    DateTime   @default(now())
+  role         Role       @relation(fields: [roleId], references: [id])
+  permission   Permission @relation(fields: [permissionId], references: [id])
+
+  @@id([roleId, permissionId])
+}
+
+model RefreshToken {
+  id         String   @id @default(cuid())
+  userId      String
+  tokenHash   String   @unique
+  expiresAt   DateTime
+  revokedAt   DateTime?
+  createdAt   DateTime @default(now())
+  user        User     @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+}
+
+model Student {
+  id                    String               @id @default(cuid())
+  gymId                 String
+  unitId                String?
+  firstName             String
+  lastName              String
+  email                 String?
+  phone                 String?
+  cpf                   String?              @unique
+  birthDate             DateTime?
+  gender                String?
+  status                StudentStatus        @default(ACTIVE)
+  notes                 String?
+  emergencyContactName  String?
+  emergencyContactPhone String?
+  photoUrl              String?
+  facialEnrollmentId    String?
+  facialEmbeddingRef    String?
+  medicalRestrictions   String?
+  createdAt             DateTime             @default(now())
+  updatedAt             DateTime             @updatedAt
+  gym                   Gym                  @relation(fields: [gymId], references: [id])
+  unit                  GymUnit?             @relation(fields: [unitId], references: [id])
+  memberships           Membership[]
+  attendance            AttendanceRecord[]
+  facialEvents          FacialRecognitionEvent[]
+  workoutPlans          WorkoutPlan[]
+  nutritionPlans        NutritionPlan[]
+  bodyMetrics           BodyMetric[]
+  salesOrders           SaleOrder[]
+  financialEntries      FinancialEntry[]
+
+  @@index([gymId, unitId, status])
+}
+
+model Plan {
+  id                String        @id @default(cuid())
+  gymId             String
+  name              String
+  description       String?
+  priceCents        Int
+  enrollmentFeeCents Int         @default(0)
+  recurrenceDays    Int
+  loyaltyDays       Int          @default(0)
+  active            Boolean      @default(true)
+  allowPause        Boolean      @default(false)
+  discountPercent   Decimal?     @db.Decimal(5, 2)
+  benefits          Json?
+  createdAt         DateTime     @default(now())
+  updatedAt         DateTime     @updatedAt
+  gym               Gym          @relation(fields: [gymId], references: [id])
+  memberships       Membership[]
+
+  @@index([gymId, active])
+}
+
+model Membership {
+  id                    String            @id @default(cuid())
+  gymId                 String
+  unitId                String?
+  studentId             String
+  planId                String
+  status                MembershipStatus  @default(PENDING)
+  startDate             DateTime
+  endDate               DateTime?
+  nextBillingDate       DateTime?
+  cancelReason          String?
+  priceCents            Int
+  discountCents         Int               @default(0)
+  paymentMethod         PaymentMethod?
+  contractUrl           String?
+  signedAt              DateTime?
+  createdAt             DateTime          @default(now())
+  updatedAt             DateTime          @updatedAt
+  gym                   Gym               @relation(fields: [gymId], references: [id])
+  unit                  GymUnit?          @relation(fields: [unitId], references: [id])
+  student               Student           @relation(fields: [studentId], references: [id])
+  plan                  Plan              @relation(fields: [planId], references: [id])
+  invoices              FinancialEntry[]  @relation("MembershipInvoices")
+
+  @@index([gymId, unitId, status])
+  @@index([studentId, status])
+}
+
+model AttendanceRecord {
+  id              String                   @id @default(cuid())
+  gymId           String
+  unitId          String?
+  studentId       String
+  source          AttendanceSource
+  checkInAt       DateTime
+  score           Decimal?                 @db.Decimal(5, 2)
+  imageUrl        String?
+  deviceId        String?
+  notes           String?
+  createdAt       DateTime                 @default(now())
+  gym             Gym                      @relation(fields: [gymId], references: [id])
+  unit            GymUnit?                 @relation(fields: [unitId], references: [id])
+  student         Student                  @relation(fields: [studentId], references: [id])
+  device          Device?                  @relation(fields: [deviceId], references: [id])
+
+  @@index([gymId, checkInAt])
+  @@index([studentId, checkInAt])
+}
+
+model FacialRecognitionEvent {
+  id             String      @id @default(cuid())
+  studentId       String?
+  gymId           String
+  unitId          String?
+  deviceId        String?
+  externalEventId String?
+  status          String
+  score           Decimal?    @db.Decimal(5, 2)
+  imageUrl        String?
+  payload         Json?
+  occurredAt      DateTime
+  createdAt       DateTime    @default(now())
+  gym             Gym         @relation(fields: [gymId], references: [id])
+  unit            GymUnit?    @relation(fields: [unitId], references: [id])
+  student         Student?    @relation(fields: [studentId], references: [id])
+  device          Device?     @relation(fields: [deviceId], references: [id])
+
+  @@index([gymId, occurredAt])
+  @@index([studentId, occurredAt])
+}
+
+model MuscleGroup {
+  id          String     @id @default(cuid())
+  gymId       String
+  name        String
+  slug        String
+  description String?
+  exercises   Exercise[]
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+  gym         Gym        @relation(fields: [gymId], references: [id])
+
+  @@unique([gymId, slug])
+}
+
+model Exercise {
+  id              String          @id @default(cuid())
+  gymId           String
+  muscleGroupId   String
+  name            String
+  slug            String
+  description     String?
+  videoUrl        String?
+  equipment       String?
+  level           ExerciseLevel   @default(BEGINNER)
+  contraindications String?
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+  gym             Gym             @relation(fields: [gymId], references: [id])
+  muscleGroup     MuscleGroup     @relation(fields: [muscleGroupId], references: [id])
+  workoutItems    WorkoutItem[]
+
+  @@unique([gymId, slug])
+  @@index([gymId, muscleGroupId])
+}
+
+model WorkoutPlan {
+  id             String         @id @default(cuid())
+  gymId          String
+  studentId      String
+  coachId        String
+  title          String
+  goal           WorkoutGoal
+  notes          String?
+  version        Int            @default(1)
+  isActive       Boolean        @default(true)
+  startsAt       DateTime?
+  endsAt         DateTime?
+  publishedAt    DateTime?
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+  gym            Gym            @relation(fields: [gymId], references: [id])
+  student        Student        @relation(fields: [studentId], references: [id])
+  coach          User           @relation("WorkoutCoach", fields: [coachId], references: [id])
+  items          WorkoutItem[]
+
+  @@index([gymId, studentId, isActive])
+}
+
+model WorkoutItem {
+  id             String      @id @default(cuid())
+  workoutPlanId  String
+  exerciseId     String
+  dayLabel       String?
+  series         Int
+  repetitions    String
+  load           String?
+  restSeconds    Int?
+  tempo          String?
+  notes          String?
+  orderIndex     Int
+  createdAt      DateTime    @default(now())
+  workoutPlan    WorkoutPlan @relation(fields: [workoutPlanId], references: [id])
+  exercise       Exercise    @relation(fields: [exerciseId], references: [id])
+
+  @@index([workoutPlanId, orderIndex])
+}
+
+model NutritionPlan {
+  id             String         @id @default(cuid())
+  gymId          String
+  studentId      String
+  ownerId        String
+  title          String
+  dailyCalories  Int?
+  proteinGrams   Decimal?       @db.Decimal(8, 2)
+  carbsGrams     Decimal?       @db.Decimal(8, 2)
+  fatGrams       Decimal?       @db.Decimal(8, 2)
+  notes          String?
+  isActive       Boolean        @default(true)
+  startsAt       DateTime?
+  endsAt         DateTime?
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+  gym            Gym            @relation(fields: [gymId], references: [id])
+  student        Student        @relation(fields: [studentId], references: [id])
+  owner          User           @relation("NutritionOwner", fields: [ownerId], references: [id])
+  meals          NutritionMeal[]
+
+  @@index([gymId, studentId, isActive])
+}
+
+model NutritionMeal {
+  id               String         @id @default(cuid())
+  nutritionPlanId  String
+  label            String
+  mealTime         String
+  calories         Int?
+  notes            String?
+  createdAt        DateTime       @default(now())
+  nutritionPlan    NutritionPlan  @relation(fields: [nutritionPlanId], references: [id])
+  items            NutritionMealItem[]
+
+  @@index([nutritionPlanId, mealTime])
+}
+
+model NutritionMealItem {
+  id             String         @id @default(cuid())
+  mealId         String
+  foodName       String
+  quantity       String
+  calories       Int?
+  proteinGrams   Decimal?       @db.Decimal(8, 2)
+  carbsGrams     Decimal?       @db.Decimal(8, 2)
+  fatGrams       Decimal?       @db.Decimal(8, 2)
+  meal           NutritionMeal  @relation(fields: [mealId], references: [id])
+}
+
+model BodyMetric {
+  id               String    @id @default(cuid())
+  studentId        String
+  weightKg         Decimal?  @db.Decimal(6, 2)
+  bodyFatPercent   Decimal?  @db.Decimal(5, 2)
+  leanMassKg       Decimal?  @db.Decimal(6, 2)
+  notes            String?
+  measuredAt       DateTime
+  createdAt        DateTime  @default(now())
+  student          Student   @relation(fields: [studentId], references: [id])
+
+  @@index([studentId, measuredAt])
+}
+
+model ProductCategory {
+  id          String     @id @default(cuid())
+  gymId       String
+  name        String
+  slug        String
+  description String?
+  products    Product[]
+  gym         Gym        @relation(fields: [gymId], references: [id])
+
+  @@unique([gymId, slug])
+}
+
+model Product {
+  id               String            @id @default(cuid())
+  gymId            String
+  categoryId       String?
+  name             String
+  sku              String?           @unique
+  description      String?
+  salePriceCents   Int
+  costPriceCents   Int?
+  stockQuantity    Int               @default(0)
+  minStockQuantity Int               @default(0)
+  active           Boolean           @default(true)
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+  gym              Gym               @relation(fields: [gymId], references: [id])
+  category         ProductCategory?  @relation(fields: [categoryId], references: [id])
+  saleItems        SaleOrderItem[]
+
+  @@index([gymId, active])
+}
+
+model SaleOrder {
+  id                String           @id @default(cuid())
+  gymId             String
+  unitId            String?
+  studentId         String?
+  sellerId          String?
+  status            SaleOrderStatus  @default(OPEN)
+  subtotalCents     Int
+  discountCents     Int              @default(0)
+  totalCents        Int
+  paymentMethod     PaymentMethod?
+  paidAt            DateTime?
+  createdAt         DateTime         @default(now())
+  updatedAt         DateTime         @updatedAt
+  gym               Gym              @relation(fields: [gymId], references: [id])
+  unit              GymUnit?         @relation(fields: [unitId], references: [id])
+  student           Student?         @relation(fields: [studentId], references: [id])
+  seller            User?            @relation("SalesSeller", fields: [sellerId], references: [id])
+  items             SaleOrderItem[]
+  financialEntry    FinancialEntry?  @relation("SaleFinancialEntry")
+
+  @@index([gymId, unitId, status])
+}
+
+model SaleOrderItem {
+  id            String     @id @default(cuid())
+  saleOrderId   String
+  productId     String
+  quantity      Int
+  unitPriceCents Int
+  totalCents    Int
+  saleOrder     SaleOrder  @relation(fields: [saleOrderId], references: [id])
+  product       Product    @relation(fields: [productId], references: [id])
+}
+
+model FinancialCategory {
+  id          String             @id @default(cuid())
+  gymId       String
+  name        String
+  type        FinancialEntryType
+  description String?
+  entries     FinancialEntry[]
+  gym         Gym                @relation(fields: [gymId], references: [id])
+
+  @@unique([gymId, name, type])
+}
+
+model FinancialEntry {
+  id                 String              @id @default(cuid())
+  gymId              String
+  unitId             String?
+  studentId          String?
+  membershipId       String?
+  saleOrderId        String?             @unique
+  categoryId         String?
+  type               FinancialEntryType
+  status             FinancialStatus     @default(PENDING)
+  description        String
+  amountCents        Int
+  dueDate            DateTime?
+  paidAt             DateTime?
+  paymentMethod      PaymentMethod?
+  gatewayReference   String?
+  webhookPayload     Json?
+  metadata           Json?
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
+  gym                Gym                 @relation(fields: [gymId], references: [id])
+  unit               GymUnit?            @relation(fields: [unitId], references: [id])
+  student            Student?            @relation(fields: [studentId], references: [id])
+  membership         Membership?         @relation("MembershipInvoices", fields: [membershipId], references: [id])
+  saleOrder          SaleOrder?          @relation("SaleFinancialEntry", fields: [saleOrderId], references: [id])
+  category           FinancialCategory?  @relation(fields: [categoryId], references: [id])
+
+  @@index([gymId, unitId, type, status])
+  @@index([studentId, dueDate])
+}
+
+model Device {
+  id             String       @id @default(cuid())
+  gymId          String
+  unitId         String?
+  name           String
+  type           DeviceType
+  status         DeviceStatus @default(ONLINE)
+  ipAddress      String?
+  port           Int?
+  protocol       String?
+  location       String?
+  lastSeenAt     DateTime?
+  settings       Json?
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+  gym            Gym          @relation(fields: [gymId], references: [id])
+  unit           GymUnit?     @relation(fields: [unitId], references: [id])
+  attendance     AttendanceRecord[]
+  facialEvents   FacialRecognitionEvent[]
+
+  @@index([gymId, unitId, type])
+}
+
+model NotificationLog {
+  id          String              @id @default(cuid())
+  gymId       String
+  studentId   String?
+  channel     NotificationChannel
+  templateKey String?
+  recipient   String
+  payload     Json?
+  status      String
+  sentAt      DateTime?
+  createdAt   DateTime            @default(now())
+  gym         Gym                 @relation(fields: [gymId], references: [id])
+}
+
+model AuditLog {
+  id            String         @id @default(cuid())
+  gymId         String
+  actorUserId   String?
+  resource      String
+  resourceId    String?
+  action        String
+  severity      AuditSeverity  @default(MEDIUM)
+  ipAddress     String?
+  userAgent     String?
+  payload       Json?
+  createdAt     DateTime       @default(now())
+  gym           Gym            @relation(fields: [gymId], references: [id])
+  actor         User?          @relation("AuditActor", fields: [actorUserId], references: [id])
+
+  @@index([gymId, resource, createdAt])
+}
