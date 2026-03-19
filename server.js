@@ -2,244 +2,220 @@ const http = require('http');
 const fs = require('fs');
 const path = require('path');
 const url = require('url');
+const crypto = require('crypto');
 
 const PORT = Number(process.env.PORT || 3000);
 const publicDir = path.join(__dirname, 'public');
+const dataFile = path.join(__dirname, 'data', 'system.json');
 
 const sidebar = [
-  { key: 'painel', label: 'Painel', path: '/painel', description: 'Dashboard geral com KPIs, entradas recentes, faturamento e horas de pico.' },
-  { key: 'usuarios', label: 'Usuários', path: '/usuarios', description: 'Gestão completa de funcionários, permissões, resets de senha e logs.' },
-  { key: 'planos', label: 'Planos', path: '/planos', description: 'Planos da academia, recorrência, descontos e histórico de assinaturas.' },
-  { key: 'frequencia', label: 'Frequência', path: '/frequencia', description: 'Lista de presença, relatórios, ranking e heatmap de horários.' },
-  { key: 'exercicios', label: 'Exercícios', path: '/exercicios', description: 'Hub de navegação da biblioteca técnica de exercícios.' },
-  { key: 'grupo-muscular', label: 'Grupo Muscular', path: '/exercicios/grupo-muscular', description: 'Cadastro dos grupos musculares como peito, costas, ombro e pernas.' },
-  { key: 'lista-exercicios', label: 'Lista de Exercícios', path: '/exercicios/lista', description: 'Cadastro completo de exercícios com vídeo, descrição e equipamento.' },
-  { key: 'treinos', label: 'Treinos', path: '/treinos', description: 'Criação de treinos completos com séries, repetições, cargas e objetivos.' },
-  { key: 'nutricao', label: 'Nutrição', path: '/nutricao', description: 'Planos alimentares, refeições por horário, macros e peso.' },
-  { key: 'vendas', label: 'Vendas', path: '/vendas', description: 'PDV, produtos, suplementos, roupas, estoque e integração financeira.' },
-  { key: 'financeiro', label: 'Financeiro', path: '/financeiro', description: 'Fluxo de caixa, entradas, saídas, gateways, webhooks e relatórios.' },
-  { key: 'relatorios', label: 'Relatórios', path: '/relatorios', description: 'Relatórios premium exportáveis em PDF e Excel com gráficos avançados.' },
-  { key: 'configuracoes', label: 'Configurações', path: '/configuracoes', description: 'Setup de catraca, câmera, IP, notificações, preferências e layout.' },
+  { key: 'painel', label: 'Painel', path: '/painel', description: 'Dashboard geral com KPIs e visão operacional em tempo real.' },
+  { key: 'usuarios', label: 'Usuários', path: '/usuarios', description: 'Funcionários, cargos, permissões e acesso ao sistema.' },
+  { key: 'planos', label: 'Planos', path: '/planos', description: 'Planos, recorrências, descontos e assinaturas.' },
+  { key: 'frequencia', label: 'Frequência', path: '/frequencia', description: 'Entradas, filtros, heatmap e ranking de frequência.' },
+  { key: 'exercicios', label: 'Exercícios', path: '/exercicios', description: 'Resumo técnico do módulo de exercícios.' },
+  { key: 'grupo-muscular', label: 'Grupo Muscular', path: '/exercicios/grupo-muscular', description: 'Cadastro de grupos musculares.' },
+  { key: 'lista-exercicios', label: 'Lista de Exercícios', path: '/exercicios/lista', description: 'Cadastro de exercícios com vídeo, descrição e equipamento.' },
+  { key: 'treinos', label: 'Treinos', path: '/treinos', description: 'Treinos completos por aluno, objetivo e professor.' },
+  { key: 'nutricao', label: 'Nutrição', path: '/nutricao', description: 'Planos alimentares e acompanhamento corporal.' },
+  { key: 'vendas', label: 'Vendas', path: '/vendas', description: 'PDV, produtos, categorias, estoque e integração financeira.' },
+  { key: 'financeiro', label: 'Financeiro', path: '/financeiro', description: 'Contas, fluxo de caixa, gateways e cobranças.' },
+  { key: 'relatorios', label: 'Relatórios', path: '/relatorios', description: 'Relatórios operacionais e exportáveis.' },
+  { key: 'configuracoes', label: 'Configurações', path: '/configuracoes', description: 'Academia, facial, catraca, pagamentos, WhatsApp e layout.' },
 ];
 
-const modules = {
-  painel: {
-    title: 'Painel Geral',
-    subtitle: 'Resumo executivo da operação da academia.',
-    highlights: [
-      { label: 'Alunos ativos', value: '842' },
-      { label: 'Inadimplentes', value: '57' },
-      { label: 'Novos alunos', value: '36' },
-      { label: 'Faturamento mensal', value: 'R$ 84.920' },
-    ],
-    lists: {
-      'Entradas recentes via facial': ['07:02 · Ana Souza · score 98.7', '07:04 · Bruno Lima · score 96.3', '07:08 · Carla Santos · score 97.9'],
-      'Horas de pico': ['06h–08h', '12h–13h', '18h–20h'],
+function defaultData() {
+  return {
+    gym: {
+      name: '',
+      tradeName: '',
+      document: '',
+      email: '',
+      phone: '',
+      timezone: 'America/Sao_Paulo',
     },
-  },
-  usuarios: {
-    title: 'Usuários',
-    subtitle: 'Gestão completa de funcionários e permissões.',
-    highlights: [
-      { label: 'Funcionários ativos', value: '18' },
-      { label: 'Perfis configurados', value: '5' },
-      { label: 'Ações auditadas hoje', value: '126' },
-      { label: 'Resets pendentes', value: '2' },
-    ],
-    lists: {
-      'Perfis padrão': ['Dono', 'Admin', 'Recepção', 'Professor', 'Nutricionista'],
-      'Controles': ['Reset de senha', 'Bloqueio de sessão', 'Permissão por menu', 'Auditoria de ações'],
+    settings: {
+      facial: {
+        enabled: false,
+        provider: '',
+        endpoint: '',
+        apiKey: '',
+        cameraSource: '',
+        threshold: 0,
+      },
+      turnstile: {
+        enabled: false,
+        name: '',
+        ip: '',
+        port: 0,
+        protocol: '',
+        timeoutMs: 0,
+        openCommand: '',
+      },
+      payments: {
+        pixEnabled: false,
+        pixProvider: '',
+        boletoEnabled: false,
+        boletoProvider: '',
+        cardEnabled: false,
+        cardProvider: '',
+        webhookUrl: '',
+      },
+      whatsapp: {
+        enabled: false,
+        provider: '',
+        token: '',
+        phoneNumberId: '',
+      },
+      layout: {
+        theme: 'dark',
+        compactSidebar: false,
+      },
     },
-  },
-  planos: {
-    title: 'Planos',
-    subtitle: 'Cadastro de planos e assinatura por aluno.',
-    highlights: [
-      { label: 'Planos ativos', value: '7' },
-      { label: 'Assinaturas vigentes', value: '801' },
-      { label: 'Ticket médio', value: 'R$ 129' },
-      { label: 'Desconto médio', value: '8%' },
-    ],
-    lists: {
-      'Recorrências': ['Mensal', 'Trimestral', 'Semestral', 'Anual'],
-      'Campos-chave': ['Valor', 'Fidelidade', 'Desconto', 'Taxa de matrícula', 'Histórico'],
-    },
-  },
-  frequencia: {
-    title: 'Frequência',
-    subtitle: 'Presença, ranking e heatmap por horário.',
-    highlights: [
-      { label: 'Check-ins hoje', value: '412' },
-      { label: 'Reconhecimento facial', value: '93%' },
-      { label: 'Ranking top 10', value: 'Disponível' },
-      { label: 'Catracas online', value: '3/3' },
-    ],
-    lists: {
-      'Filtros': ['Aluno', 'Período', 'Tipo de plano', 'Origem da entrada'],
-      'Visualizações': ['Lista de presença', 'Heatmap', 'Ranking', 'Eventos faciais'],
-    },
-  },
-  exercicios: {
-    title: 'Exercícios',
-    subtitle: 'Hub da biblioteca técnica de exercícios.',
-    highlights: [
-      { label: 'Exercícios cadastrados', value: '214' },
-      { label: 'Grupos musculares', value: '8' },
-      { label: 'Vídeos vinculados', value: '186' },
-      { label: 'Equipamentos mapeados', value: '32' },
-    ],
-    lists: {
-      'Acessos rápidos': ['Grupo muscular', 'Lista de exercícios', 'Restrições', 'Equipamentos'],
-      'Padrão comercial': ['Vídeo', 'Descrição', 'Nível', 'Equipamento', 'Observações'],
-    },
-  },
-  'grupo-muscular': {
-    title: 'Grupo Muscular',
-    subtitle: 'Cadastro dos grupos musculares base.',
-    highlights: [
-      { label: 'Base padrão', value: '8 grupos' },
-      { label: 'Mais usados', value: 'Peito / Pernas' },
-      { label: 'Ativos', value: '100%' },
-      { label: 'Atualização', value: 'Centralizada' },
-    ],
-    lists: {
-      'Grupos padrão': ['Peito', 'Costas', 'Ombro', 'Bíceps', 'Tríceps', 'Pernas', 'Glúteo', 'Abs'],
-    },
-  },
-  'lista-exercicios': {
-    title: 'Lista de Exercícios',
-    subtitle: 'Cadastro completo da biblioteca de exercícios.',
-    highlights: [
-      { label: 'Cadastros completos', value: '214' },
-      { label: 'Com vídeo', value: '186' },
-      { label: 'Com equipamento', value: '203' },
-      { label: 'Níveis mapeados', value: '3' },
-    ],
-    lists: {
-      'Campos obrigatórios': ['Nome', 'Descrição', 'Link de vídeo', 'Grupo muscular', 'Equipamento'],
-    },
-  },
-  treinos: {
-    title: 'Treinos',
-    subtitle: 'Prescrição de treinos completos por objetivo.',
-    highlights: [
-      { label: 'Treinos ativos', value: '533' },
-      { label: 'Revisões pendentes', value: '28' },
-      { label: 'Objetivos padrão', value: '6' },
-      { label: 'Professores logados', value: '4' },
-    ],
-    lists: {
-      'Objetivos': ['Hipertrofia', 'Emagrecimento', 'Iniciante', 'Condicionamento', 'Reabilitação', 'Performance'],
-      'Campos técnicos': ['Séries', 'Repetições', 'Carga', 'Descanso', 'Tempo', 'Histórico'],
-    },
-  },
-  nutricao: {
-    title: 'Nutrição',
-    subtitle: 'Planos alimentares, macros e evolução corporal.',
-    highlights: [
-      { label: 'Planos ativos', value: '147' },
-      { label: 'Pesagens no mês', value: '94' },
-      { label: 'Macros calculadas', value: 'Automático' },
-      { label: 'Nutricionistas', value: '2' },
-    ],
-    lists: {
-      'Blocos do módulo': ['Plano alimentar', 'Refeições por horário', 'Macros do dia', 'Acompanhamento de peso'],
-    },
-  },
-  vendas: {
-    title: 'Vendas',
-    subtitle: 'PDV, estoque e integração com financeiro.',
-    highlights: [
-      { label: 'Produtos ativos', value: '126' },
-      { label: 'Vendas hoje', value: 'R$ 3.420' },
-      { label: 'Itens em estoque baixo', value: '11' },
-      { label: 'Categorias', value: '9' },
-    ],
-    lists: {
-      'PDV': ['Suplementos', 'Roupas', 'Acessórios', 'Bebidas', 'Serviços avulsos'],
-      'Recursos': ['Cupom', 'Desconto', 'Estoque', 'Relatórios', 'Integração financeira'],
-    },
-  },
-  financeiro: {
-    title: 'Financeiro',
-    subtitle: 'Fluxo de caixa, gateway e relatórios financeiros.',
-    highlights: [
-      { label: 'Recebimentos previstos', value: 'R$ 102.400' },
-      { label: 'Pagamentos do mês', value: 'R$ 29.700' },
-      { label: 'MRR', value: 'R$ 78.900' },
-      { label: 'Inadimplência', value: '6.8%' },
-    ],
-    lists: {
-      'Métodos': ['Pix', 'Boleto', 'Cartão', 'Transferência'],
-      'Rotinas': ['Fluxo de caixa', 'Entradas e saídas', 'Webhooks', 'Conciliação', 'DRE simplificado'],
-    },
-  },
-  relatorios: {
-    title: 'Relatórios',
-    subtitle: 'Relatórios premium exportáveis e analíticos.',
-    highlights: [
-      { label: 'Relatórios salvos', value: '24' },
-      { label: 'Exports no mês', value: '67' },
-      { label: 'Formatos', value: 'PDF / Excel' },
-      { label: 'Filtros persistentes', value: 'Sim' },
-    ],
-    lists: {
-      'Relatórios padrão': ['Frequência', 'Financeiro', 'Cancelamentos', 'Vendas', 'Produtividade'],
-    },
-  },
-  configuracoes: {
-    title: 'Configurações',
-    subtitle: 'Parâmetros gerais, branding e dispositivos.',
-    highlights: [
-      { label: 'Câmeras configuradas', value: '4' },
-      { label: 'Catracas configuradas', value: '3' },
-      { label: 'Templates WhatsApp', value: '12' },
-      { label: 'Tema premium', value: 'Ativo' },
-    ],
-    lists: {
-      'Setup': ['IP da catraca', 'Porta', 'Protocolo', 'Timeout', 'Câmera', 'Layout', 'Notificações'],
-    },
-  },
-};
+    users: [],
+    students: [],
+    plans: [],
+    memberships: [],
+    muscleGroups: [],
+    exercises: [],
+    workouts: [],
+    nutritionPlans: [],
+    products: [],
+    sales: [],
+    financialEntries: [],
+    attendance: [],
+  };
+}
 
-const apiResponse = {
-  product: 'Sistema Premium de Gestão de Academia',
-  version: 'demo-executavel-1.0.0',
-  menuCount: sidebar.length,
-  sidebar,
-  modules,
-  integrations: [
-    'Reconhecimento facial integrado',
-    'Controle físico de catraca',
-    'Pix, boleto e cartão',
-    'WhatsApp automático',
-    'Logs e auditoria',
-  ],
-};
+function ensureDataFile() {
+  if (!fs.existsSync(dataFile)) {
+    fs.mkdirSync(path.dirname(dataFile), { recursive: true });
+    fs.writeFileSync(dataFile, JSON.stringify(defaultData(), null, 2));
+  }
+}
 
-function sendJson(res, statusCode, data) {
+function loadData() {
+  ensureDataFile();
+  const raw = fs.readFileSync(dataFile, 'utf8');
+  return { ...defaultData(), ...JSON.parse(raw) };
+}
+
+function saveData(data) {
+  fs.writeFileSync(dataFile, JSON.stringify(data, null, 2));
+}
+
+function withId(record) {
+  return {
+    id: crypto.randomUUID(),
+    createdAt: new Date().toISOString(),
+    ...record,
+  };
+}
+
+function calculateDashboard(data) {
+  const activeMemberships = data.memberships.filter((item) => item.status === 'active').length;
+  const overdueMemberships = data.memberships.filter((item) => item.status === 'overdue').length;
+  const monthlyRevenue = data.financialEntries
+    .filter((item) => item.type === 'income' && item.status === 'paid')
+    .reduce((acc, item) => acc + Number(item.amount || 0), 0);
+
+  return {
+    activeStudents: data.students.length,
+    activeMemberships,
+    overdueMemberships,
+    users: data.users.length,
+    plans: data.plans.length,
+    checkins: data.attendance.length,
+    exercises: data.exercises.length,
+    workouts: data.workouts.length,
+    nutritionPlans: data.nutritionPlans.length,
+    products: data.products.length,
+    financialEntries: data.financialEntries.length,
+    monthlyRevenue,
+  };
+}
+
+function applyAttendanceFilters(records, query, data) {
+  return records.filter((record) => {
+    if (query.studentId && record.studentId !== query.studentId) return false;
+
+    if (query.planId) {
+      const membership = data.memberships.find((item) => item.studentId === record.studentId && item.planId === query.planId);
+      if (!membership) return false;
+    }
+
+    if (query.dateFrom && new Date(record.checkedAt) < new Date(query.dateFrom)) return false;
+    if (query.dateTo && new Date(record.checkedAt) > new Date(query.dateTo + 'T23:59:59')) return false;
+    return true;
+  });
+}
+
+function summarizeSystem(data) {
+  return {
+    gym: data.gym,
+    settings: data.settings,
+    dashboard: calculateDashboard(data),
+    sidebar,
+    users: data.users,
+    students: data.students,
+    plans: data.plans,
+    memberships: data.memberships,
+    muscleGroups: data.muscleGroups,
+    exercises: data.exercises,
+    workouts: data.workouts,
+    nutritionPlans: data.nutritionPlans,
+    products: data.products,
+    sales: data.sales,
+    financialEntries: data.financialEntries,
+    attendance: data.attendance,
+  };
+}
+
+function sendJson(res, statusCode, payload) {
   res.writeHead(statusCode, { 'Content-Type': 'application/json; charset=utf-8' });
-  res.end(JSON.stringify(data, null, 2));
+  res.end(JSON.stringify(payload, null, 2));
+}
+
+function notFound(res) {
+  return sendJson(res, 404, { error: 'Not found' });
+}
+
+function parseBody(req) {
+  return new Promise((resolve, reject) => {
+    let body = '';
+    req.on('data', (chunk) => {
+      body += chunk.toString();
+    });
+    req.on('end', () => {
+      if (!body) return resolve({});
+      try {
+        resolve(JSON.parse(body));
+      } catch (error) {
+        reject(error);
+      }
+    });
+  });
 }
 
 function serveStaticFile(reqPath, res) {
   const filePath = path.join(publicDir, reqPath === '/' ? 'index.html' : reqPath.replace(/^\//, ''));
   const normalized = path.normalize(filePath);
   if (!normalized.startsWith(publicDir)) {
-    sendJson(res, 403, { error: 'Forbidden' });
-    return;
+    return sendJson(res, 403, { error: 'Forbidden' });
   }
 
   fs.readFile(normalized, (error, content) => {
     if (error) {
-      if (reqPath !== '/' && reqPath.endsWith('.html') === false) {
-        return serveStaticFile('/', res);
+      if (!reqPath.includes('.') || reqPath.endsWith('.html')) {
+        return fs.readFile(path.join(publicDir, 'index.html'), (fallbackError, fallbackContent) => {
+          if (fallbackError) return notFound(res);
+          res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+          res.end(fallbackContent);
+        });
       }
-      sendJson(res, 404, { error: 'File not found' });
-      return;
+      return notFound(res);
     }
 
-    const ext = path.extname(normalized);
     const contentTypes = {
       '.html': 'text/html; charset=utf-8',
       '.js': 'application/javascript; charset=utf-8',
@@ -247,29 +223,192 @@ function serveStaticFile(reqPath, res) {
       '.json': 'application/json; charset=utf-8',
     };
 
-    res.writeHead(200, { 'Content-Type': contentTypes[ext] || 'text/plain; charset=utf-8' });
+    res.writeHead(200, { 'Content-Type': contentTypes[path.extname(normalized)] || 'text/plain; charset=utf-8' });
     res.end(content);
   });
 }
 
-const server = http.createServer((req, res) => {
+async function handlePostCollection(req, res, collectionName, normalizer) {
+  const data = loadData();
+  const payload = await parseBody(req);
+  const item = withId(normalizer(payload));
+  data[collectionName].push(item);
+  saveData(data);
+  return sendJson(res, 201, item);
+}
+
+function normalizeBoolean(value) {
+  return value === true || value === 'true' || value === 'on';
+}
+
+const server = http.createServer(async (req, res) => {
   const parsed = url.parse(req.url, true);
 
-  if (parsed.pathname === '/api/health') {
-    return sendJson(res, 200, { status: 'ok', port: PORT });
-  }
+  try {
+    if (req.method === 'GET' && parsed.pathname === '/api/health') {
+      return sendJson(res, 200, { status: 'ok', port: PORT });
+    }
 
-  if (parsed.pathname === '/api/system') {
-    return sendJson(res, 200, apiResponse);
-  }
+    if (req.method === 'GET' && parsed.pathname === '/api/system') {
+      return sendJson(res, 200, summarizeSystem(loadData()));
+    }
 
-  if (parsed.pathname === '/api/dashboard') {
-    return sendJson(res, 200, modules.painel);
-  }
+    if (req.method === 'POST' && parsed.pathname === '/api/reset') {
+      const data = defaultData();
+      saveData(data);
+      return sendJson(res, 200, summarizeSystem(data));
+    }
 
-  return serveStaticFile(parsed.pathname || '/', res);
+    if (req.method === 'GET' && parsed.pathname === '/api/dashboard') {
+      const data = loadData();
+      return sendJson(res, 200, calculateDashboard(data));
+    }
+
+    if (req.method === 'POST' && parsed.pathname === '/api/settings') {
+      const data = loadData();
+      const payload = await parseBody(req);
+      data.gym = { ...data.gym, ...(payload.gym || {}) };
+      data.settings = {
+        facial: { ...data.settings.facial, ...(payload.settings?.facial || {}) },
+        turnstile: { ...data.settings.turnstile, ...(payload.settings?.turnstile || {}) },
+        payments: { ...data.settings.payments, ...(payload.settings?.payments || {}) },
+        whatsapp: { ...data.settings.whatsapp, ...(payload.settings?.whatsapp || {}) },
+        layout: { ...data.settings.layout, ...(payload.settings?.layout || {}) },
+      };
+      saveData(data);
+      return sendJson(res, 200, { success: true, gym: data.gym, settings: data.settings });
+    }
+
+    if (req.method === 'POST' && parsed.pathname === '/api/users') {
+      return handlePostCollection(req, res, 'users', (payload) => ({
+        name: payload.name || '',
+        email: payload.email || '',
+        role: payload.role || '',
+        status: payload.status || 'active',
+      }));
+    }
+
+    if (req.method === 'POST' && parsed.pathname === '/api/students') {
+      return handlePostCollection(req, res, 'students', (payload) => ({
+        name: payload.name || '',
+        email: payload.email || '',
+        phone: payload.phone || '',
+        notes: payload.notes || '',
+      }));
+    }
+
+    if (req.method === 'POST' && parsed.pathname === '/api/plans') {
+      return handlePostCollection(req, res, 'plans', (payload) => ({
+        name: payload.name || '',
+        price: Number(payload.price || 0),
+        recurrenceDays: Number(payload.recurrenceDays || 0),
+        description: payload.description || '',
+      }));
+    }
+
+    if (req.method === 'POST' && parsed.pathname === '/api/memberships') {
+      return handlePostCollection(req, res, 'memberships', (payload) => ({
+        studentId: payload.studentId || '',
+        planId: payload.planId || '',
+        status: payload.status || 'active',
+        startDate: payload.startDate || '',
+      }));
+    }
+
+    if (req.method === 'POST' && parsed.pathname === '/api/muscle-groups') {
+      return handlePostCollection(req, res, 'muscleGroups', (payload) => ({
+        name: payload.name || '',
+        description: payload.description || '',
+      }));
+    }
+
+    if (req.method === 'POST' && parsed.pathname === '/api/exercises') {
+      return handlePostCollection(req, res, 'exercises', (payload) => ({
+        name: payload.name || '',
+        muscleGroupId: payload.muscleGroupId || '',
+        videoUrl: payload.videoUrl || '',
+        equipment: payload.equipment || '',
+        description: payload.description || '',
+      }));
+    }
+
+    if (req.method === 'POST' && parsed.pathname === '/api/workouts') {
+      return handlePostCollection(req, res, 'workouts', (payload) => ({
+        studentId: payload.studentId || '',
+        coachName: payload.coachName || '',
+        title: payload.title || '',
+        goal: payload.goal || '',
+        notes: payload.notes || '',
+      }));
+    }
+
+    if (req.method === 'POST' && parsed.pathname === '/api/nutrition-plans') {
+      return handlePostCollection(req, res, 'nutritionPlans', (payload) => ({
+        studentId: payload.studentId || '',
+        title: payload.title || '',
+        calories: Number(payload.calories || 0),
+        notes: payload.notes || '',
+      }));
+    }
+
+    if (req.method === 'POST' && parsed.pathname === '/api/products') {
+      return handlePostCollection(req, res, 'products', (payload) => ({
+        name: payload.name || '',
+        category: payload.category || '',
+        stock: Number(payload.stock || 0),
+        price: Number(payload.price || 0),
+      }));
+    }
+
+    if (req.method === 'POST' && parsed.pathname === '/api/sales') {
+      return handlePostCollection(req, res, 'sales', (payload) => ({
+        productId: payload.productId || '',
+        quantity: Number(payload.quantity || 0),
+        amount: Number(payload.amount || 0),
+        paymentMethod: payload.paymentMethod || '',
+      }));
+    }
+
+    if (req.method === 'POST' && parsed.pathname === '/api/financial-entries') {
+      return handlePostCollection(req, res, 'financialEntries', (payload) => ({
+        description: payload.description || '',
+        type: payload.type || 'income',
+        status: payload.status || 'pending',
+        amount: Number(payload.amount || 0),
+        dueDate: payload.dueDate || '',
+      }));
+    }
+
+    if (req.method === 'POST' && parsed.pathname === '/api/attendance') {
+      return handlePostCollection(req, res, 'attendance', (payload) => ({
+        studentId: payload.studentId || '',
+        source: payload.source || 'manual',
+        checkedAt: payload.checkedAt || new Date().toISOString(),
+        deviceName: payload.deviceName || '',
+        confidence: Number(payload.confidence || 0),
+        releasedTurnstile: normalizeBoolean(payload.releasedTurnstile),
+      }));
+    }
+
+    if (req.method === 'GET' && parsed.pathname === '/api/attendance') {
+      const data = loadData();
+      const filtered = applyAttendanceFilters(data.attendance, parsed.query, data).map((record) => {
+        const student = data.students.find((item) => item.id === record.studentId);
+        return {
+          ...record,
+          studentName: student ? student.name : '',
+        };
+      });
+      return sendJson(res, 200, filtered);
+    }
+
+    return serveStaticFile(parsed.pathname || '/', res);
+  } catch (error) {
+    return sendJson(res, 500, { error: error.message || 'Unexpected error' });
+  }
 });
 
+ensureDataFile();
 server.listen(PORT, () => {
   console.log(`Sistema Premium de Gestão de Academia disponível em http://localhost:${PORT}`);
 });

@@ -61,3 +61,19 @@ http://localhost:3000
 ### Observação
 
 Esta demo é uma **visualização executável** da arquitetura e do menu obrigatório. Ela não substitui a implementação completa em React + Vite + Tailwind + Zustand + Prisma, mas permite navegar e validar o conceito imediatamente.
+
+
+## Persistência real local
+
+Os dados agora são persistidos no arquivo:
+
+```text
+data/system.json
+```
+
+Isso significa que:
+
+- o sistema começa zerado;
+- todos os cadastros e configurações são salvos em disco;
+- filtros de frequência por aluno, período e tipo de plano usam os dados reais cadastrados;
+- configurações de facial, catraca, pagamentos e WhatsApp ficam editáveis na tela de Configurações.

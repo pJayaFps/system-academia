@@ -1,0 +1,60 @@
+{
+  "gym": {
+    "name": "",
+    "tradeName": "",
+    "document": "",
+    "email": "",
+    "phone": "",
+    "timezone": "America/Sao_Paulo"
+  },
+  "settings": {
+    "facial": {
+      "enabled": false,
+      "provider": "",
+      "endpoint": "",
+      "apiKey": "",
+      "cameraSource": "",
+      "threshold": 0
+    },
+    "turnstile": {
+      "enabled": false,
+      "name": "",
+      "ip": "",
+      "port": 0,
+      "protocol": "",
+      "timeoutMs": 0,
+      "openCommand": ""
+    },
+    "payments": {
+      "pixEnabled": false,
+      "pixProvider": "",
+      "boletoEnabled": false,
+      "boletoProvider": "",
+      "cardEnabled": false,
+      "cardProvider": "",
+      "webhookUrl": ""
+    },
+    "whatsapp": {
+      "enabled": false,
+      "provider": "",
+      "token": "",
+      "phoneNumberId": ""
+    },
+    "layout": {
+      "theme": "dark",
+      "compactSidebar": false
+    }
+  },
+  "users": [],
+  "students": [],
+  "plans": [],
+  "memberships": [],
+  "muscleGroups": [],
+  "exercises": [],
+  "workouts": [],
+  "nutritionPlans": [],
+  "products": [],
+  "sales": [],
+  "financialEntries": [],
+  "attendance": []
+}

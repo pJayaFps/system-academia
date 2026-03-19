@@ -22,30 +22,29 @@
       <main class="content">
         <header class="topbar">
           <div>
-            <p class="eyebrow">Demo executável</p>
-            <h1 id="page-title">Carregando...</h1>
+            <p class="eyebrow">Sistema configurável</p>
+            <h1 id="page-title">Painel</h1>
           </div>
           <div class="topbar-actions">
-            <a class="button ghost" href="/api/system" target="_blank" rel="noreferrer">Ver API JSON</a>
-            <button id="refresh-button" class="button primary">Atualizar dados</button>
+            <button id="reload-button" class="button ghost">Recarregar</button>
+            <button id="reset-button" class="button danger">Zerar sistema</button>
           </div>
         </header>
 
         <section class="hero-card">
           <div>
-            <span class="hero-tag">Sistema comercial</span>
-            <h2 id="module-title">Carregando módulo...</h2>
+            <span class="hero-tag">Base funcional local</span>
+            <h2 id="module-title">Carregando...</h2>
             <p id="module-subtitle"></p>
           </div>
           <div class="hero-note">
-            <strong>Incluso nesta demo</strong>
-            <ul id="integration-list"></ul>
+            <strong>Status operacional</strong>
+            <ul id="hero-status-list"></ul>
           </div>
         </section>
 
-        <section id="highlights-grid" class="highlights-grid"></section>
-
-        <section id="module-lists" class="list-grid"></section>
+        <section id="alerts" class="alerts"></section>
+        <section id="module-body" class="module-body"></section>
       </main>
     </div>
 
