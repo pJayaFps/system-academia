@@ -118,16 +118,49 @@ function selectOptions(items, valueKey = 'id', labelKey = 'name') {
 
 function renderPainel() {
   const dashboard = state.system.dashboard;
+  const reactivationRows = state.system.students.filter((student) => {
+    const records = state.system.attendance.filter((item) => item.studentId === student.id);
+    if (!records.length) return true;
+    const last = records.map((item) => new Date(item.checkedAt).getTime()).sort((a, b) => b - a)[0];
+    const days = (Date.now() - last) / (1000 * 60 * 60 * 24);
+    return days >= 30;
+  }).map((student) => [student.name, student.phone || student.email || 'Sem contato', 'Reativação']);
+
   return `
     <section class="grid four">
       ${card('Alunos cadastrados', dashboard.activeStudents)}
-      ${card('Planos cadastrados', dashboard.plans)}
-      ${card('Check-ins registrados', dashboard.checkins)}
-      ${card('Receita paga acumulada', `R$ ${Number(dashboard.monthlyRevenue || 0).toFixed(2)}`)}
+      ${card('Leads quentes', dashboard.hotLeads)}
+      ${card('Conversão de leads', `${dashboard.conversionRate}%`)}
+      ${card('Previsão de receita', `R$ ${Number(dashboard.forecastRevenue || 0).toFixed(2)}`)}
     </section>
-    <section class="panel-card">
-      <h3>Leitura real da base</h3>
-      <p>Todos os números acima são calculados com base nos registros persistidos em disco no arquivo <code>data/system.json</code>. O sistema inicia zerado e cresce conforme você cadastra dados.</p>
+    <section class="grid two">
+      <section class="panel-card">
+        <h3>Captar lead comercial</h3>
+        <form data-endpoint="/api/leads" class="resource-form">
+          <div class="grid two">
+            <label>Nome<input name="name" required /></label>
+            <label>Telefone<input name="phone" /></label>
+            <label>Origem<input name="source" placeholder="Instagram, indicação, Google..." /></label>
+            <label>Interesse<input name="interest" placeholder="musculação, funcional, premium..." /></label>
+            <label>Status<select name="status"><option value="new">Novo</option><option value="hot">Quente</option><option value="proposal">Proposta</option><option value="won">Fechado</option><option value="lost">Perdido</option></select></label>
+          </div>
+          <button class="button primary" type="submit">Salvar lead</button>
+        </form>
+      </section>
+      <section class="panel-card">
+        <h3>Leitura real da base</h3>
+        <p>Os indicadores são gerados automaticamente a partir dos dados salvos. Isso ajuda o dono a enxergar funil comercial, reativação e previsão de receita sem depender de planilha.</p>
+      </section>
+    </section>
+    <section class="grid two">
+      <section class="panel-card">
+        <h3>Leads cadastrados</h3>
+        ${renderTable(['Nome', 'Telefone', 'Origem', 'Interesse', 'Status'], state.system.leads.map((item) => [item.name, item.phone, item.source, item.interest, item.status]))}
+      </section>
+      <section class="panel-card">
+        <h3>Possíveis reativações</h3>
+        ${renderTable(['Aluno', 'Contato', 'Ação'], reactivationRows)}
+      </section>
     </section>
   `;
 }
@@ -397,15 +430,29 @@ function renderRelatorios() {
       ${card('Entradas lançadas', `R$ ${revenue.toFixed(2)}`)}
       ${card('Saídas lançadas', `R$ ${expenses.toFixed(2)}`)}
     </section>
-    <section class="panel-card">
-      <h3>Resumo exportável</h3>
-      <pre class="json-preview">${JSON.stringify({
-        students: state.system.students.length,
-        plans: state.system.plans.length,
-        memberships: state.system.memberships.length,
-        attendance: state.system.attendance.length,
-        financialEntries: state.system.financialEntries.length,
-      }, null, 2)}</pre>
+    <section class="grid two">
+      <section class="panel-card">
+        <h3>Indicadores de venda</h3>
+        ${renderTable(['Indicador', 'Valor'], [
+          ['Leads cadastrados', state.system.leads.length],
+          ['Leads quentes', state.system.dashboard.hotLeads],
+          ['Conversão', `${state.system.dashboard.conversionRate}%`],
+          ['Previsão de receita', `R$ ${Number(state.system.dashboard.forecastRevenue || 0).toFixed(2)}`],
+          ['Reativações possíveis', state.system.dashboard.reactivationCandidates],
+        ])}
+      </section>
+      <section class="panel-card">
+        <h3>Resumo exportável</h3>
+        <pre class="json-preview">${JSON.stringify({
+          students: state.system.students.length,
+          plans: state.system.plans.length,
+          memberships: state.system.memberships.length,
+          attendance: state.system.attendance.length,
+          financialEntries: state.system.financialEntries.length,
+          leads: state.system.leads.length,
+          automationRules: state.system.automationRules.length,
+        }, null, 2)}</pre>
+      </section>
     </section>
   `;
 }
@@ -477,6 +524,21 @@ function renderConfiguracoes() {
 
         <button class="button primary" type="submit">Salvar configurações</button>
       </form>
+    </section>
+    <section class="panel-card">
+      <h3>Automação comercial e retenção</h3>
+      <form data-endpoint="/api/automation-rules" class="resource-form">
+        <div class="grid two">
+          <label>Nome da regra<input name="name" required /></label>
+          <label>Trigger<input name="trigger" placeholder="lead_hot, overdue, no_checkin_30d..." /></label>
+          <label>Canal<input name="channel" placeholder="WhatsApp, e-mail..." /></label>
+          <label>Status<select name="active"><option value="true">Ativa</option><option value="false">Inativa</option></select></label>
+          <label class="full-width">Template<textarea name="template" placeholder="Mensagem que será usada na automação"></textarea></label>
+        </div>
+        <button class="button primary" type="submit">Salvar automação</button>
+      </form>
+      <div class="spacer"></div>
+      ${renderTable(['Nome', 'Trigger', 'Canal', 'Ativa'], state.system.automationRules.map((item) => [item.name, item.trigger, item.channel, item.active ? 'Sim' : 'Não']))}
     </section>
   `;
 }

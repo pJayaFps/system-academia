@@ -103,3 +103,5 @@ th { color: var(--muted); font-weight: 600; }
   .sidebar { position: static; height: auto; }
   .topbar { flex-direction: column; align-items: flex-start; }
 }
+
+.spacer { height: 18px; }

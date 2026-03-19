@@ -77,3 +77,12 @@ Isso significa que:
 - todos os cadastros e configurações são salvos em disco;
 - filtros de frequência por aluno, período e tipo de plano usam os dados reais cadastrados;
 - configurações de facial, catraca, pagamentos e WhatsApp ficam editáveis na tela de Configurações.
+
+
+## Diferenciais comerciais já incluídos
+
+- funil de leads com status comercial;
+- previsão de receita com base nos planos ativos;
+- lista de possíveis reativações por falta de frequência;
+- regras de automação para WhatsApp e campanhas de retenção;
+- painel e relatórios com foco em crescimento comercial.

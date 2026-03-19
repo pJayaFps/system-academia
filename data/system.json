@@ -56,5 +56,7 @@
   "products": [],
   "sales": [],
   "financialEntries": [],
-  "attendance": []
+  "attendance": [],
+  "leads": [],
+  "automationRules": []
 }

@@ -84,6 +84,8 @@ function defaultData() {
     sales: [],
     financialEntries: [],
     attendance: [],
+    leads: [],
+    automationRules: [],
   };
 }
 
@@ -119,6 +121,25 @@ function calculateDashboard(data) {
     .filter((item) => item.type === 'income' && item.status === 'paid')
     .reduce((acc, item) => acc + Number(item.amount || 0), 0);
 
+  const forecastRevenue = data.memberships
+    .filter((item) => item.status === 'active')
+    .reduce((acc, membership) => {
+      const plan = data.plans.find((item) => item.id === membership.planId);
+      return acc + Number(plan?.price || 0);
+    }, 0);
+
+  const hotLeads = data.leads.filter((item) => ['hot', 'proposal'].includes(item.status)).length;
+  const wonLeads = data.leads.filter((item) => item.status === 'won').length;
+  const conversionRate = data.leads.length ? Number(((wonLeads / data.leads.length) * 100).toFixed(2)) : 0;
+
+  const reactivationCandidates = data.students.filter((student) => {
+    const records = data.attendance.filter((item) => item.studentId === student.id);
+    if (!records.length) return true;
+    const last = records.map((item) => new Date(item.checkedAt).getTime()).sort((a, b) => b - a)[0];
+    const days = (Date.now() - last) / (1000 * 60 * 60 * 24);
+    return days >= 30;
+  }).length;
+
   return {
     activeStudents: data.students.length,
     activeMemberships,
@@ -132,6 +153,10 @@ function calculateDashboard(data) {
     products: data.products.length,
     financialEntries: data.financialEntries.length,
     monthlyRevenue,
+    forecastRevenue,
+    hotLeads,
+    conversionRate,
+    reactivationCandidates,
   };
 }
 
@@ -168,6 +193,8 @@ function summarizeSystem(data) {
     sales: data.sales,
     financialEntries: data.financialEntries,
     attendance: data.attendance,
+    leads: data.leads,
+    automationRules: data.automationRules,
   };
 }
 
@@ -376,6 +403,26 @@ const server = http.createServer(async (req, res) => {
         status: payload.status || 'pending',
         amount: Number(payload.amount || 0),
         dueDate: payload.dueDate || '',
+      }));
+    }
+
+    if (req.method === 'POST' && parsed.pathname === '/api/leads') {
+      return handlePostCollection(req, res, 'leads', (payload) => ({
+        name: payload.name || '',
+        phone: payload.phone || '',
+        source: payload.source || '',
+        interest: payload.interest || '',
+        status: payload.status || 'new',
+      }));
+    }
+
+    if (req.method === 'POST' && parsed.pathname === '/api/automation-rules') {
+      return handlePostCollection(req, res, 'automationRules', (payload) => ({
+        name: payload.name || '',
+        trigger: payload.trigger || '',
+        channel: payload.channel || '',
+        active: normalizeBoolean(payload.active),
+        template: payload.template || '',
       }));
     }
 
