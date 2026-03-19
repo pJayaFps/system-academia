@@ -38,7 +38,8 @@
       "enabled": false,
       "provider": "",
       "token": "",
-      "phoneNumberId": ""
+      "phoneNumberId": "",
+      "endpoint": ""
     },
     "layout": {
       "theme": "dark",
@@ -58,5 +59,6 @@
   "financialEntries": [],
   "attendance": [],
   "leads": [],
-  "automationRules": []
+  "automationRules": [],
+  "auditLogs": []
 }

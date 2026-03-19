@@ -454,6 +454,10 @@ function renderRelatorios() {
         }, null, 2)}</pre>
       </section>
     </section>
+    <section class="panel-card">
+      <h3>Auditoria operacional</h3>
+      ${renderTable(['Ação', 'Recurso', 'Criado em'], state.system.auditLogs.map((item) => [item.action, item.resource, item.createdAt]))}
+    </section>
   `;
 }
 
@@ -514,6 +518,7 @@ function renderConfiguracoes() {
           <label>Provider<input name="settings.whatsapp.provider" value="${settings.whatsapp.provider || ''}" /></label>
           <label>Token<input name="settings.whatsapp.token" value="${settings.whatsapp.token || ''}" /></label>
           <label>Phone Number ID<input name="settings.whatsapp.phoneNumberId" value="${settings.whatsapp.phoneNumberId || ''}" /></label>
+          <label>Endpoint<input name="settings.whatsapp.endpoint" value="${settings.whatsapp.endpoint || ''}" /></label>
         </div>
 
         <h4>Layout</h4>
@@ -539,6 +544,32 @@ function renderConfiguracoes() {
       </form>
       <div class="spacer"></div>
       ${renderTable(['Nome', 'Trigger', 'Canal', 'Ativa'], state.system.automationRules.map((item) => [item.name, item.trigger, item.channel, item.active ? 'Sim' : 'Não']))}
+    </section>
+    <section class="panel-card">
+      <h3>Ações operacionais de integração</h3>
+      <form data-endpoint="/api/integrations/facial/identify" class="resource-form">
+        <div class="grid two">
+          <label>Aluno (facial)<select name="studentId">${selectOptions(state.system.students)}</select></label>
+          <label>Confiança<input name="confidence" type="number" min="0" step="0.01" value="0" /></label>
+        </div>
+        <button class="button primary" type="submit">Executar identificação facial</button>
+      </form>
+      <div class="spacer"></div>
+      <form data-endpoint="/api/integrations/turnstile/open" class="resource-form">
+        <div class="grid two">
+          <label>Aluno (catraca)<select name="studentId">${selectOptions(state.system.students)}</select></label>
+          <label>Motivo<input name="reason" placeholder="liberação de acesso" /></label>
+        </div>
+        <button class="button primary" type="submit">Executar abertura de catraca</button>
+      </form>
+      <div class="spacer"></div>
+      <form data-endpoint="/api/integrations/whatsapp/test" class="resource-form">
+        <div class="grid two">
+          <label>Destino<input name="to" placeholder="5511999999999" /></label>
+          <label>Mensagem<input name="message" placeholder="Mensagem de teste" /></label>
+        </div>
+        <button class="button primary" type="submit">Executar WhatsApp teste</button>
+      </form>
     </section>
   `;
 }

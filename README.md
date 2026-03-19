@@ -86,3 +86,15 @@ Isso significa que:
 - lista de possíveis reativações por falta de frequência;
 - regras de automação para WhatsApp e campanhas de retenção;
 - painel e relatórios com foco em crescimento comercial.
+
+
+## Endpoints operacionais de integração
+
+Além dos endpoints de cadastro, a base agora possui ações operacionais para integração real:
+
+- `POST /api/integrations/facial/identify`
+- `POST /api/integrations/turnstile/open`
+- `POST /api/integrations/whatsapp/test`
+- `POST /api/payments/webhooks/:provider`
+
+Essas ações já geram auditoria local e podem encaminhar requisições para endpoints externos configurados no sistema.

@@ -66,6 +66,7 @@ function defaultData() {
         provider: '',
         token: '',
         phoneNumberId: '',
+        endpoint: '',
       },
       layout: {
         theme: 'dark',
@@ -86,6 +87,7 @@ function defaultData() {
     attendance: [],
     leads: [],
     automationRules: [],
+    auditLogs: [],
   };
 }
 
@@ -112,6 +114,26 @@ function withId(record) {
     createdAt: new Date().toISOString(),
     ...record,
   };
+}
+
+function addAuditLog(data, action, resource, payload = {}) {
+  data.auditLogs.unshift(withId({ action, resource, payload }));
+  data.auditLogs = data.auditLogs.slice(0, 100);
+}
+
+async function runExternalRequest(targetUrl, payload) {
+  if (!targetUrl) {
+    return { executed: false, message: 'Nenhum endpoint configurado.' };
+  }
+
+  const response = await fetch(targetUrl, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload || {}),
+  });
+
+  const text = await response.text();
+  return { executed: true, status: response.status, body: text };
 }
 
 function calculateDashboard(data) {
@@ -195,6 +217,7 @@ function summarizeSystem(data) {
     attendance: data.attendance,
     leads: data.leads,
     automationRules: data.automationRules,
+    auditLogs: data.auditLogs,
   };
 }
 
@@ -260,6 +283,7 @@ async function handlePostCollection(req, res, collectionName, normalizer) {
   const payload = await parseBody(req);
   const item = withId(normalizer(payload));
   data[collectionName].push(item);
+  addAuditLog(data, 'create_record', collectionName, { id: item.id });
   saveData(data);
   return sendJson(res, 201, item);
 }
@@ -282,6 +306,7 @@ const server = http.createServer(async (req, res) => {
 
     if (req.method === 'POST' && parsed.pathname === '/api/reset') {
       const data = defaultData();
+      addAuditLog(data, 'reset_system', 'system', {});
       saveData(data);
       return sendJson(res, 200, summarizeSystem(data));
     }
@@ -302,8 +327,70 @@ const server = http.createServer(async (req, res) => {
         whatsapp: { ...data.settings.whatsapp, ...(payload.settings?.whatsapp || {}) },
         layout: { ...data.settings.layout, ...(payload.settings?.layout || {}) },
       };
+      addAuditLog(data, 'update_settings', 'settings', { gymName: data.gym.name });
       saveData(data);
       return sendJson(res, 200, { success: true, gym: data.gym, settings: data.settings });
+    }
+
+    if (req.method === 'POST' && parsed.pathname === '/api/integrations/facial/identify') {
+      const data = loadData();
+      const payload = await parseBody(req);
+      const student = data.students.find((item) => item.id === payload.studentId);
+      if (!student) return sendJson(res, 400, { error: 'Aluno não encontrado.' });
+
+      const attendance = withId({
+        studentId: payload.studentId,
+        source: 'facial',
+        checkedAt: payload.checkedAt || new Date().toISOString(),
+        deviceName: payload.deviceName || data.settings.facial.cameraSource || 'facial',
+        confidence: Number(payload.confidence || data.settings.facial.threshold || 0),
+        releasedTurnstile: false,
+      });
+
+      data.attendance.push(attendance);
+      addAuditLog(data, 'facial_identify', 'integration', { studentId: payload.studentId, confidence: attendance.confidence });
+
+      const external = await runExternalRequest(data.settings.facial.endpoint, payload);
+      saveData(data);
+      return sendJson(res, 200, { success: true, attendance, external });
+    }
+
+    if (req.method === 'POST' && parsed.pathname === '/api/integrations/turnstile/open') {
+      const data = loadData();
+      const payload = await parseBody(req);
+      const settings = data.settings.turnstile;
+      const url = settings.openCommand || (settings.ip ? `${settings.protocol || 'http'}://${settings.ip}${settings.port ? `:${settings.port}` : ''}` : '');
+      const external = await runExternalRequest(url, payload);
+      addAuditLog(data, 'turnstile_open', 'integration', { reason: payload.reason || '', studentId: payload.studentId || '' });
+      saveData(data);
+      return sendJson(res, 200, { success: true, external });
+    }
+
+    if (req.method === 'POST' && parsed.pathname === '/api/integrations/whatsapp/test') {
+      const data = loadData();
+      const payload = await parseBody(req);
+      const external = await runExternalRequest(data.settings.whatsapp.endpoint, payload);
+      addAuditLog(data, 'whatsapp_test', 'integration', { to: payload.to || '', message: payload.message || '' });
+      saveData(data);
+      return sendJson(res, 200, { success: true, external });
+    }
+
+    if (req.method === 'POST' && parsed.pathname.startsWith('/api/payments/webhooks/')) {
+      const data = loadData();
+      const payload = await parseBody(req);
+      const provider = parsed.pathname.split('/').pop();
+      addAuditLog(data, 'payment_webhook', 'payment', { provider, payload });
+      if (payload.description || payload.amount) {
+        data.financialEntries.push(withId({
+          description: payload.description || `Webhook ${provider}`,
+          type: payload.type || 'income',
+          status: payload.status || 'paid',
+          amount: Number(payload.amount || 0),
+          dueDate: payload.dueDate || '',
+        }));
+      }
+      saveData(data);
+      return sendJson(res, 200, { success: true, provider });
     }
 
     if (req.method === 'POST' && parsed.pathname === '/api/users') {
