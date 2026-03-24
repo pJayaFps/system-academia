@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { AdminLogin } from './components/AdminLogin';
 import { AdminPanel } from './components/AdminPanel';
 import { FilterTabs } from './components/FilterTabs';
 import { ProductCard } from './components/ProductCard';
@@ -57,20 +58,22 @@ function App() {
 
   const total = useMemo(() => cart.reduce((acc, item) => acc + item.price * item.quantity, 0), [cart]);
 
-  async function loadCatalog() {
-    const response = await fetch(`${API_URL}/api/products`);
-    const data = await response.json();
-    setCatalog(data.products ?? []);
-  }
-
   useEffect(() => {
-    loadCatalog().catch(() => setError('Não foi possível carregar catálogo.'));
+    fetch(`${API_URL}/api/products`)
+      .then((res) => res.json())
+      .then((data) => setCatalog(data.products ?? []))
+      .catch(() => setError('Não foi possível carregar catálogo.'));
 
     fetch(`${API_URL}/api/payments/options`)
       .then((res) => res.json())
       .then((data) => setPaymentOptions(data.methods ?? []))
       .catch(() => setError('Não foi possível carregar métodos de pagamento.'));
   }, []);
+
+  function logoutAdmin() {
+    setAdminToken('');
+    setStep('catalogo');
+  }
 
   function addToCart(product) {
     setCart((current) => {
@@ -121,6 +124,7 @@ function App() {
       const data = await response.json();
       if (!response.ok) throw new Error(data.message || 'Falha no login admin.');
       setAdminToken(data.token);
+      setStep('admin-panel');
     } catch (requestError) {
       setError(requestError.message);
     } finally {
@@ -240,12 +244,37 @@ function App() {
           <h1 className="text-3xl font-bold text-white sm:text-4xl">Ateliê Prime Store</h1>
           <p className="text-zinc-400">Experiência premium: catálogo, etapas de checkout e envio para WhatsApp.</p>
         </div>
-        <button
-          onClick={() => setStep('carrinho')}
-          className="rounded-full border border-zinc-700 bg-zinc-900 px-4 py-2 text-sm font-semibold text-zinc-100 hover:border-accent"
-        >
-          🛒 Carrinho ({cart.reduce((acc, item) => acc + item.quantity, 0)})
-        </button>
+        <div className="flex flex-wrap gap-2">
+          <button
+            onClick={() => setStep('carrinho')}
+            className="rounded-full border border-zinc-700 bg-zinc-900 px-4 py-2 text-sm font-semibold text-zinc-100 hover:border-accent"
+          >
+            🛒 Carrinho ({cart.reduce((acc, item) => acc + item.quantity, 0)})
+          </button>
+          {!adminToken ? (
+            <button
+              onClick={() => setStep('admin-login')}
+              className="rounded-full border border-zinc-700 bg-zinc-900 px-4 py-2 text-sm font-semibold text-zinc-100 hover:border-accent"
+            >
+              Login admin
+            </button>
+          ) : (
+            <>
+              <button
+                onClick={() => setStep('admin-panel')}
+                className="rounded-full border border-zinc-700 bg-zinc-900 px-4 py-2 text-sm font-semibold text-zinc-100 hover:border-accent"
+              >
+                Painel admin
+              </button>
+              <button
+                onClick={logoutAdmin}
+                className="rounded-full border border-rose-500/40 bg-rose-900/20 px-4 py-2 text-sm font-semibold text-rose-300 hover:border-rose-400"
+              >
+                Sair
+              </button>
+            </>
+          )}
+        </div>
       </header>
 
       <StepIndicator step={step} />
@@ -266,17 +295,13 @@ function App() {
               <ProductCard key={product.id} product={product} onAdd={addToCart} onOpenDetails={setSelectedProduct} />
             ))}
           </div>
-
-          <AdminPanel
-            products={catalog}
-            token={adminToken}
-            onLogin={loginAdmin}
-            onCreate={createProduct}
-            onUpdate={updateProduct}
-            onDelete={deleteProduct}
-            loading={loading}
-          />
         </section>
+      )}
+
+      {step === 'admin-login' && <AdminLogin onLogin={loginAdmin} loading={loading} />}
+
+      {step === 'admin-panel' && adminToken && (
+        <AdminPanel products={catalog} onCreate={createProduct} onUpdate={updateProduct} onDelete={deleteProduct} loading={loading} />
       )}
 
       {step === 'carrinho' && (

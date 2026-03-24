@@ -8,7 +8,7 @@ Loja de roupas online com visual premium, checkout por etapas e finalização au
 - Backend: Node.js + Express
 - Pagamento: API mock com Pix, débito, crédito e PayPal
 - Checkout: catálogo → carrinho → dados do cliente → pagamento → confirmação
-- Admin: login + CRUD completo de produtos (adicionar, editar, remover)
+- Admin: login em página separada + botão de sair + CRUD completo de produtos (adicionar, editar, remover)
 
 ## Como rodar
 
@@ -54,6 +54,7 @@ ADMIN_PASSWORD=123456
 3. Página de dados do cliente
 4. Página de forma de pagamento (Pix, débito, crédito, PayPal)
 5. Confirmação de pagamento e envio para WhatsApp
+6. Login admin em página separada e painel admin em página separada
 
 ## Endpoints da API mock
 
