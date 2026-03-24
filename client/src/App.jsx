@@ -1,21 +1,49 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { AdminPanel } from './components/AdminPanel';
-import { CartDrawer } from './components/CartDrawer';
-import { CheckoutForm } from './components/CheckoutForm';
 import { FilterTabs } from './components/FilterTabs';
 import { ProductCard } from './components/ProductCard';
+import { ProductDetailsModal } from './components/ProductDetailsModal';
+import { StepIndicator } from './components/StepIndicator';
 import { brands, categories, products as seedProducts } from './data/products';
 
 const API_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:3001';
 const WHATSAPP_NUMBER = import.meta.env.VITE_WHATSAPP_NUMBER ?? '5511999999999';
 
+const initialCustomer = {
+  nome: '',
+  sobrenome: '',
+  telefone: '',
+  rua: '',
+  numero: '',
+  bairro: '',
+  cidade: ''
+};
+
+const initialPayment = {
+  method: '',
+  installments: 1,
+  cardName: '',
+  cardNumber: '',
+  expiry: '',
+  cvv: ''
+};
+
+function currency(value) {
+  return value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+}
+
 function App() {
+  const [step, setStep] = useState('catalogo');
   const [activeBrand, setActiveBrand] = useState('Todos');
   const [activeCategory, setActiveCategory] = useState('Todas');
   const [catalog, setCatalog] = useState(seedProducts);
   const [cart, setCart] = useState([]);
-  const [loadingPix, setLoadingPix] = useState(false);
-  const [pixData, setPixData] = useState(null);
+  const [selectedProduct, setSelectedProduct] = useState(null);
+  const [customer, setCustomer] = useState(initialCustomer);
+  const [paymentOptions, setPaymentOptions] = useState([]);
+  const [payment, setPayment] = useState(initialPayment);
+  const [paymentData, setPaymentData] = useState(null);
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
   const filteredProducts = useMemo(() => {
@@ -27,6 +55,13 @@ function App() {
   }, [catalog, activeBrand, activeCategory]);
 
   const total = useMemo(() => cart.reduce((acc, item) => acc + item.price * item.quantity, 0), [cart]);
+
+  useEffect(() => {
+    fetch(`${API_URL}/api/payments/options`)
+      .then((res) => res.json())
+      .then((data) => setPaymentOptions(data.methods ?? []))
+      .catch(() => setError('Não foi possível carregar métodos de pagamento.'));
+  }, []);
 
   function addToCart(product) {
     setCart((current) => {
@@ -46,8 +81,14 @@ function App() {
     );
   }
 
-  function buildOrderMessage(customer, paymentMethod = 'Pix') {
+  function createProduct(product) {
+    setCatalog((current) => [{ id: crypto.randomUUID(), ...product, description: 'Novo produto premium.' }, ...current]);
+  }
+
+  function buildOrderMessage() {
     const lines = cart.map((item) => `- ${item.name} (${item.quantity}x)`).join('\n');
+    const paymentLabel = payment.method === 'credit' ? `Cartão de crédito (${payment.installments}x)` : payment.method;
+
     return [
       'Novo Pedido 🛒',
       '',
@@ -58,130 +99,238 @@ function App() {
       'Produtos:',
       lines,
       '',
-      `Total: ${total.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}`,
-      `Pagamento: ${paymentMethod}`
+      `Total: ${currency(total)}`,
+      `Pagamento: ${paymentLabel}`
     ].join('\n');
   }
 
-  async function handleCheckout(customer) {
-    if (!cart.length) {
-      setError('Adicione produtos no carrinho antes de gerar o Pix.');
-      return;
-    }
-
-    setLoadingPix(true);
+  async function submitPayment() {
+    setLoading(true);
     setError('');
 
     try {
-      const response = await fetch(`${API_URL}/api/pix/create`, {
+      const response = await fetch(`${API_URL}/api/payments/create`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           amount: total,
           customer,
-          items: cart
+          items: cart,
+          payment
         })
       });
-
+      const data = await response.json();
       if (!response.ok) {
-        throw new Error('Não foi possível gerar cobrança Pix.');
+        throw new Error(data.message || 'Erro ao criar pagamento.');
       }
-
-      const pix = await response.json();
-      setPixData({ ...pix, customer });
+      setPaymentData(data);
+      setStep('confirmacao');
     } catch (requestError) {
       setError(requestError.message);
     } finally {
-      setLoadingPix(false);
+      setLoading(false);
     }
   }
 
-  async function confirmPayment() {
-    if (!pixData) {
+  async function confirmPaymentAndRedirect() {
+    if (!paymentData?.paymentId) {
       return;
     }
-
-    const response = await fetch(`${API_URL}/api/pix/confirm`, {
+    const response = await fetch(`${API_URL}/api/payments/confirm`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ paymentId: pixData.paymentId })
+      body: JSON.stringify({ paymentId: paymentData.paymentId })
     });
-
     const result = await response.json();
     if (result.status !== 'paid') {
-      setError('Pagamento não confirmado. Tente novamente.');
+      setError('Não foi possível confirmar o pagamento.');
       return;
     }
 
-    const message = buildOrderMessage(pixData.customer);
+    const message = buildOrderMessage();
     const link = `https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(message)}`;
     window.location.href = link;
   }
 
-  function createProduct(product) {
-    const newProduct = {
-      id: crypto.randomUUID(),
-      ...product
-    };
-
-    setCatalog((current) => [newProduct, ...current]);
-  }
-
   return (
     <main className="mx-auto min-h-screen max-w-7xl space-y-8 px-4 py-6 sm:px-6 lg:px-8">
-      <header className="space-y-3 text-center">
-        <p className="inline-flex rounded-full border border-zinc-700 px-3 py-1 text-xs font-medium text-zinc-300">
-          Catálogo + Checkout via WhatsApp
-        </p>
-        <h1 className="text-4xl font-bold tracking-tight text-white">Ateliê Prime Store</h1>
-        <p className="mx-auto max-w-2xl text-zinc-400">
-          Moda premium com experiência mobile-first, pagamento Pix e finalização automática no WhatsApp.
-        </p>
+      <header className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h1 className="text-3xl font-bold text-white sm:text-4xl">Ateliê Prime Store</h1>
+          <p className="text-zinc-400">Experiência premium: catálogo, etapas de checkout e envio para WhatsApp.</p>
+        </div>
+        <button
+          onClick={() => setStep('carrinho')}
+          className="rounded-full border border-zinc-700 bg-zinc-900 px-4 py-2 text-sm font-semibold text-zinc-100 hover:border-accent"
+        >
+          🛒 Carrinho ({cart.reduce((acc, item) => acc + item.quantity, 0)})
+        </button>
       </header>
 
-      <FilterTabs
-        brands={brands}
-        categories={categories}
-        activeBrand={activeBrand}
-        activeCategory={activeCategory}
-        setActiveBrand={setActiveBrand}
-        setActiveCategory={setActiveCategory}
-      />
+      <StepIndicator step={step} />
 
-      <section className="grid gap-6 lg:grid-cols-[2fr_1fr]">
-        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-          {filteredProducts.map((product) => (
-            <ProductCard key={product.id} product={product} onAdd={addToCart} />
-          ))}
-        </div>
-        <CartDrawer
-          cartItems={cart}
-          onIncrease={(id) => updateQuantity(id, 1)}
-          onDecrease={(id) => updateQuantity(id, -1)}
-          total={total}
-        />
-      </section>
+      {step === 'catalogo' && (
+        <section className="space-y-6">
+          <FilterTabs
+            brands={brands}
+            categories={categories}
+            activeBrand={activeBrand}
+            activeCategory={activeCategory}
+            setActiveBrand={setActiveBrand}
+            setActiveCategory={setActiveCategory}
+          />
 
-      <section className="grid gap-6 lg:grid-cols-2">
-        <CheckoutForm onSubmit={handleCheckout} loading={loadingPix} disabled={!cart.length} />
-        <div className="space-y-4 rounded-2xl border border-zinc-800 bg-zinc-900/60 p-5">
-          <h2 className="text-xl font-bold text-white">Pagamento Pix</h2>
-          {!pixData ? (
-            <p className="text-sm text-zinc-400">Após preencher seus dados, gere o Pix para visualizar QR Code e chave dinâmica.</p>
+          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+            {filteredProducts.map((product) => (
+              <ProductCard key={product.id} product={product} onAdd={addToCart} onOpenDetails={setSelectedProduct} />
+            ))}
+          </div>
+          <AdminPanel onCreate={createProduct} />
+        </section>
+      )}
+
+      {step === 'carrinho' && (
+        <section className="space-y-4 rounded-2xl border border-zinc-800 bg-zinc-900/60 p-5">
+          <h2 className="text-2xl font-bold text-white">Carrinho de compras</h2>
+          {cart.length === 0 ? (
+            <p className="text-zinc-400">Seu carrinho está vazio.</p>
           ) : (
             <div className="space-y-3">
-              <img src={pixData.qrCodeImage} alt="QR Code Pix" className="w-full max-w-xs rounded-xl border border-zinc-700" />
-              <p className="break-all rounded-lg bg-zinc-950 p-3 text-xs text-zinc-300">{pixData.pixKey}</p>
-              <button onClick={confirmPayment} className="w-full rounded-xl bg-accent px-4 py-3 font-semibold text-white hover:bg-violet-500">
-                Confirmar pagamento e enviar no WhatsApp
-              </button>
+              {cart.map((item) => (
+                <div key={item.id} className="flex items-center justify-between rounded-xl border border-zinc-800 p-3">
+                  <div>
+                    <p className="font-semibold text-white">{item.name}</p>
+                    <p className="text-sm text-zinc-400">{currency(item.price)}</p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button onClick={() => updateQuantity(item.id, -1)} className="h-8 w-8 rounded-lg bg-zinc-800">
+                      -
+                    </button>
+                    <span>{item.quantity}</span>
+                    <button onClick={() => updateQuantity(item.id, 1)} className="h-8 w-8 rounded-lg bg-zinc-800">
+                      +
+                    </button>
+                  </div>
+                </div>
+              ))}
+              <p className="text-right text-2xl font-bold text-white">Total: {currency(total)}</p>
             </div>
           )}
-          {error && <p className="text-sm text-rose-400">{error}</p>}
-        </div>
-      </section>
+          <div className="flex flex-wrap gap-2">
+            <button onClick={() => setStep('catalogo')} className="rounded-xl border border-zinc-700 px-4 py-2 hover:bg-zinc-800">
+              Continuar comprando
+            </button>
+            <button
+              onClick={() => setStep('cliente')}
+              disabled={!cart.length}
+              className="rounded-xl bg-accent px-4 py-2 font-semibold text-white disabled:opacity-50"
+            >
+              Finalizar pagamento
+            </button>
+          </div>
+        </section>
+      )}
 
-      <AdminPanel onCreate={createProduct} />
+      {step === 'cliente' && (
+        <section className="space-y-4 rounded-2xl border border-zinc-800 bg-zinc-900/60 p-5">
+          <h2 className="text-2xl font-bold text-white">Dados do cliente</h2>
+          <form
+            className="grid gap-3 sm:grid-cols-2"
+            onSubmit={(event) => {
+              event.preventDefault();
+              const data = Object.fromEntries(new FormData(event.currentTarget).entries());
+              setCustomer(data);
+              setStep('pagamento');
+            }}
+          >
+            {Object.keys(initialCustomer).map((field) => (
+              <input
+                key={field}
+                required
+                name={field}
+                defaultValue={customer[field]}
+                placeholder={field}
+                className="rounded-xl border border-zinc-700 bg-zinc-950 px-3 py-2"
+              />
+            ))}
+            <button className="rounded-xl bg-accent px-4 py-3 font-semibold text-white sm:col-span-2">Escolher forma de pagamento</button>
+          </form>
+        </section>
+      )}
+
+      {step === 'pagamento' && (
+        <section className="space-y-4 rounded-2xl border border-zinc-800 bg-zinc-900/60 p-5">
+          <h2 className="text-2xl font-bold text-white">Forma de pagamento</h2>
+          <div className="flex flex-wrap gap-2">
+            {paymentOptions.map((method) => (
+              <button
+                key={method.id}
+                onClick={() => setPayment((current) => ({ ...current, method: method.id }))}
+                className={`rounded-full px-4 py-2 text-sm font-semibold ${payment.method === method.id ? 'bg-accent text-white' : 'bg-zinc-800 text-zinc-200'}`}
+              >
+                {method.label}
+              </button>
+            ))}
+          </div>
+
+          {payment.method === 'credit' && (
+            <div className="grid gap-3 sm:grid-cols-2">
+              <input placeholder="Nome no cartão" className="rounded-xl bg-zinc-950 p-2" onChange={(e) => setPayment((c) => ({ ...c, cardName: e.target.value }))} />
+              <input placeholder="Número do cartão" className="rounded-xl bg-zinc-950 p-2" onChange={(e) => setPayment((c) => ({ ...c, cardNumber: e.target.value }))} />
+              <input placeholder="Validade (MM/AA)" className="rounded-xl bg-zinc-950 p-2" onChange={(e) => setPayment((c) => ({ ...c, expiry: e.target.value }))} />
+              <input placeholder="CVV" className="rounded-xl bg-zinc-950 p-2" onChange={(e) => setPayment((c) => ({ ...c, cvv: e.target.value }))} />
+              <select
+                className="rounded-xl bg-zinc-950 p-2 sm:col-span-2"
+                value={payment.installments}
+                onChange={(e) => setPayment((c) => ({ ...c, installments: Number(e.target.value) }))}
+              >
+                {[1, 2, 3, 4, 5, 6, 10, 12].map((item) => (
+                  <option key={item} value={item}>
+                    {item}x
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+
+          {payment.method === 'pix' && (
+            <p className="rounded-xl bg-zinc-950 p-3 text-sm text-zinc-300">Pagamento instantâneo. QR Code será exibido na próxima etapa.</p>
+          )}
+
+          {payment.method && (
+            <button onClick={submitPayment} disabled={loading} className="rounded-xl bg-emerald-500 px-4 py-3 font-semibold text-zinc-900">
+              {loading ? 'Processando...' : 'Confirmar pagamento'}
+            </button>
+          )}
+        </section>
+      )}
+
+      {step === 'confirmacao' && paymentData && (
+        <section className="space-y-4 rounded-2xl border border-zinc-800 bg-zinc-900/60 p-5">
+          <h2 className="text-2xl font-bold text-white">Pagamento confirmado</h2>
+          <p className="text-zinc-300">ID: {paymentData.paymentId}</p>
+          {paymentData.pixKey && (
+            <div className="space-y-2">
+              <img src={paymentData.qrCodeImage} alt="QR Code Pix" className="w-48 rounded-xl border border-zinc-700" />
+              <p className="break-all rounded-lg bg-zinc-950 p-2 text-xs text-zinc-400">{paymentData.pixKey}</p>
+            </div>
+          )}
+          <button onClick={confirmPaymentAndRedirect} className="rounded-xl bg-accent px-4 py-3 font-semibold text-white">
+            Enviar pedido no WhatsApp
+          </button>
+        </section>
+      )}
+
+      {error && <p className="rounded-xl border border-rose-500/30 bg-rose-950/40 p-3 text-rose-300">{error}</p>}
+
+      <ProductDetailsModal
+        product={selectedProduct}
+        onClose={() => setSelectedProduct(null)}
+        onAdd={(product) => {
+          addToCart(product);
+          setSelectedProduct(null);
+        }}
+      />
     </main>
   );
 }

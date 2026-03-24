@@ -10,28 +10,46 @@ app.use(express.json());
 
 const payments = new Map();
 
+const methods = [
+  { id: 'pix', label: 'Pix' },
+  { id: 'debit', label: 'Cartão de débito' },
+  { id: 'credit', label: 'Cartão de crédito', installments: [1, 2, 3, 4, 5, 6, 10, 12] },
+  { id: 'paypal', label: 'PayPal' }
+];
+
 app.get('/api/health', (_req, res) => {
   res.json({ status: 'ok', now: new Date().toISOString() });
 });
 
-app.post('/api/pix/create', (req, res) => {
-  const { amount, customer, items } = req.body;
+app.get('/api/payments/options', (_req, res) => {
+  res.json({ methods });
+});
 
-  if (!amount || !customer || !items?.length) {
-    return res.status(400).json({ message: 'Dados inválidos para gerar Pix.' });
+app.post('/api/payments/create', (req, res) => {
+  const { amount, customer, items, payment } = req.body;
+
+  if (!amount || !customer || !items?.length || !payment?.method) {
+    return res.status(400).json({ message: 'Dados inválidos para gerar pagamento.' });
   }
 
   const paymentId = randomUUID();
-  const pixKey = `pix-${paymentId.slice(0, 8)}-${Date.now()}`;
-  const qrCodeImage = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(pixKey)}`;
-
-  payments.set(paymentId, {
+  const payload = {
     amount,
     customer,
     items,
+    payment,
     status: 'pending',
     createdAt: new Date().toISOString()
-  });
+  };
+
+  let pixKey;
+  let qrCodeImage;
+  if (payment.method === 'pix') {
+    pixKey = `pix-${paymentId.slice(0, 8)}-${Date.now()}`;
+    qrCodeImage = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(pixKey)}`;
+  }
+
+  payments.set(paymentId, payload);
 
   return res.json({
     paymentId,
@@ -41,7 +59,7 @@ app.post('/api/pix/create', (req, res) => {
   });
 });
 
-app.post('/api/pix/confirm', (req, res) => {
+app.post('/api/payments/confirm', (req, res) => {
   const { paymentId } = req.body;
 
   if (!payments.has(paymentId)) {
@@ -61,5 +79,5 @@ app.post('/api/pix/confirm', (req, res) => {
 });
 
 app.listen(port, () => {
-  console.log(`API Pix mock rodando em http://localhost:${port}`);
+  console.log(`API de pagamentos mock rodando em http://localhost:${port}`);
 });

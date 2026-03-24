@@ -1,13 +1,13 @@
 # Ateliê Prime Store
 
-Site de loja de roupas online com visual premium, catálogo com filtros, carrinho, checkout com dados do cliente, pagamento Pix (mock) e finalização automática no WhatsApp.
+Loja de roupas online com visual premium, checkout por etapas e finalização automática no WhatsApp.
 
 ## Stack
 
 - Frontend: React + Vite + Tailwind CSS
 - Backend: Node.js + Express
-- Pagamento: Pix mock (QR Code + confirmação simulada)
-- Checkout: Redirecionamento para WhatsApp com mensagem pré-formatada
+- Pagamento: API mock com Pix, débito, crédito e PayPal
+- Checkout: catálogo → carrinho → dados do cliente → pagamento → confirmação
 
 ## Como rodar
 
@@ -39,13 +39,16 @@ VITE_API_URL=http://localhost:3001
 VITE_WHATSAPP_NUMBER=5511999999999
 ```
 
-## Funcionalidades implementadas
+## Fluxo implementado
 
-- Grid responsivo de produtos com hover premium
-- Filtro por marcas (tabs) e categorias
-- Carrinho com adição, remoção e atualização de quantidade
-- Formulário de cliente completo
-- Geração de Pix mock com QR Code e chave dinâmica
-- Simulação de confirmação de pagamento
-- Mensagem automática com pedido completo e redirecionamento para WhatsApp
-- Painel admin opcional para adicionar novos produtos no catálogo
+1. Catálogo com filtros e modal de detalhes do produto
+2. Carrinho em página separada
+3. Página de dados do cliente
+4. Página de forma de pagamento (Pix, débito, crédito, PayPal)
+5. Confirmação de pagamento e envio para WhatsApp
+
+## Endpoints da API mock
+
+- `GET /api/payments/options`
+- `POST /api/payments/create`
+- `POST /api/payments/confirm`
