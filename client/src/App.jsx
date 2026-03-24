@@ -4,7 +4,7 @@ import { FilterTabs } from './components/FilterTabs';
 import { ProductCard } from './components/ProductCard';
 import { ProductDetailsModal } from './components/ProductDetailsModal';
 import { StepIndicator } from './components/StepIndicator';
-import { brands, categories, products as seedProducts } from './data/products';
+import { brands, categories } from './data/products';
 
 const API_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:3001';
 const WHATSAPP_NUMBER = import.meta.env.VITE_WHATSAPP_NUMBER ?? '5511999999999';
@@ -36,13 +36,14 @@ function App() {
   const [step, setStep] = useState('catalogo');
   const [activeBrand, setActiveBrand] = useState('Todos');
   const [activeCategory, setActiveCategory] = useState('Todas');
-  const [catalog, setCatalog] = useState(seedProducts);
+  const [catalog, setCatalog] = useState([]);
   const [cart, setCart] = useState([]);
   const [selectedProduct, setSelectedProduct] = useState(null);
   const [customer, setCustomer] = useState(initialCustomer);
   const [paymentOptions, setPaymentOptions] = useState([]);
   const [payment, setPayment] = useState(initialPayment);
   const [paymentData, setPaymentData] = useState(null);
+  const [adminToken, setAdminToken] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
@@ -56,7 +57,15 @@ function App() {
 
   const total = useMemo(() => cart.reduce((acc, item) => acc + item.price * item.quantity, 0), [cart]);
 
+  async function loadCatalog() {
+    const response = await fetch(`${API_URL}/api/products`);
+    const data = await response.json();
+    setCatalog(data.products ?? []);
+  }
+
   useEffect(() => {
+    loadCatalog().catch(() => setError('Não foi possível carregar catálogo.'));
+
     fetch(`${API_URL}/api/payments/options`)
       .then((res) => res.json())
       .then((data) => setPaymentOptions(data.methods ?? []))
@@ -81,10 +90,6 @@ function App() {
     );
   }
 
-  function createProduct(product) {
-    setCatalog((current) => [{ id: crypto.randomUUID(), ...product, description: 'Novo produto premium.' }, ...current]);
-  }
-
   function buildOrderMessage() {
     const lines = cart.map((item) => `- ${item.name} (${item.quantity}x)`).join('\n');
     const paymentLabel = payment.method === 'credit' ? `Cartão de crédito (${payment.installments}x)` : payment.method;
@@ -102,6 +107,83 @@ function App() {
       `Total: ${currency(total)}`,
       `Pagamento: ${paymentLabel}`
     ].join('\n');
+  }
+
+  async function loginAdmin(credentials) {
+    setLoading(true);
+    setError('');
+    try {
+      const response = await fetch(`${API_URL}/api/admin/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(credentials)
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.message || 'Falha no login admin.');
+      setAdminToken(data.token);
+    } catch (requestError) {
+      setError(requestError.message);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function createProduct(product) {
+    setLoading(true);
+    setError('');
+    try {
+      const response = await fetch(`${API_URL}/api/admin/products`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${adminToken}` },
+        body: JSON.stringify(product)
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.message || 'Erro ao adicionar produto.');
+      setCatalog((current) => [data.product, ...current]);
+    } catch (requestError) {
+      setError(requestError.message);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function updateProduct(id, product) {
+    setLoading(true);
+    setError('');
+    try {
+      const response = await fetch(`${API_URL}/api/admin/products/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${adminToken}` },
+        body: JSON.stringify(product)
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.message || 'Erro ao atualizar produto.');
+      setCatalog((current) => current.map((item) => (item.id === id ? data.product : item)));
+    } catch (requestError) {
+      setError(requestError.message);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function deleteProduct(id) {
+    setLoading(true);
+    setError('');
+    try {
+      const response = await fetch(`${API_URL}/api/admin/products/${id}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${adminToken}` }
+      });
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.message || 'Erro ao remover produto.');
+      }
+      setCatalog((current) => current.filter((item) => item.id !== id));
+    } catch (requestError) {
+      setError(requestError.message);
+    } finally {
+      setLoading(false);
+    }
   }
 
   async function submitPayment() {
@@ -133,9 +215,8 @@ function App() {
   }
 
   async function confirmPaymentAndRedirect() {
-    if (!paymentData?.paymentId) {
-      return;
-    }
+    if (!paymentData?.paymentId) return;
+
     const response = await fetch(`${API_URL}/api/payments/confirm`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -185,7 +266,16 @@ function App() {
               <ProductCard key={product.id} product={product} onAdd={addToCart} onOpenDetails={setSelectedProduct} />
             ))}
           </div>
-          <AdminPanel onCreate={createProduct} />
+
+          <AdminPanel
+            products={catalog}
+            token={adminToken}
+            onLogin={loginAdmin}
+            onCreate={createProduct}
+            onUpdate={updateProduct}
+            onDelete={deleteProduct}
+            loading={loading}
+          />
         </section>
       )}
 
@@ -291,10 +381,6 @@ function App() {
                 ))}
               </select>
             </div>
-          )}
-
-          {payment.method === 'pix' && (
-            <p className="rounded-xl bg-zinc-950 p-3 text-sm text-zinc-300">Pagamento instantâneo. QR Code será exibido na próxima etapa.</p>
           )}
 
           {payment.method && (

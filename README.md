@@ -8,6 +8,7 @@ Loja de roupas online com visual premium, checkout por etapas e finalização au
 - Backend: Node.js + Express
 - Pagamento: API mock com Pix, débito, crédito e PayPal
 - Checkout: catálogo → carrinho → dados do cliente → pagamento → confirmação
+- Admin: login + CRUD completo de produtos (adicionar, editar, remover)
 
 ## Como rodar
 
@@ -30,13 +31,20 @@ npm run dev:server
 npm run dev:client
 ```
 
-## Variáveis opcionais do frontend
+## Variáveis opcionais
 
-No `client/.env`:
+### Frontend (`client/.env`)
 
 ```env
 VITE_API_URL=http://localhost:3001
 VITE_WHATSAPP_NUMBER=5511999999999
+```
+
+### Backend (`server/.env`)
+
+```env
+ADMIN_EMAIL=admin@atelieprime.com
+ADMIN_PASSWORD=123456
 ```
 
 ## Fluxo implementado
@@ -49,6 +57,11 @@ VITE_WHATSAPP_NUMBER=5511999999999
 
 ## Endpoints da API mock
 
+- `GET /api/products`
+- `POST /api/admin/login`
+- `POST /api/admin/products`
+- `PUT /api/admin/products/:id`
+- `DELETE /api/admin/products/:id`
 - `GET /api/payments/options`
 - `POST /api/payments/create`
 - `POST /api/payments/confirm`
