@@ -1,18 +1,13 @@
 import express from 'express';
 import cors from 'cors';
 import { randomUUID } from 'node:crypto';
+import { initDatabase, seedDatabase } from './db.js';
 
 const app = express();
 const port = process.env.PORT || 3001;
 
 const ADMIN_EMAIL = process.env.ADMIN_EMAIL || 'admin@atelieprime.com';
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || '123456';
-
-app.use(cors());
-app.use(express.json());
-
-const payments = new Map();
-const adminSessions = new Map();
 
 const methods = [
   { id: 'pix', label: 'Pix' },
@@ -21,42 +16,24 @@ const methods = [
   { id: 'paypal', label: 'PayPal' }
 ];
 
-const products = [
-  {
-    id: 'nk-tee-01',
-    name: 'Camiseta Nike Essential',
-    brand: 'Nike',
-    category: 'Camiseta',
-    price: 129.9,
-    description: 'Camiseta premium em algodão macio, corte moderno e ótimo caimento para uso diário.',
-    image: 'https://images.unsplash.com/photo-1622445272461-c6580cab8755?auto=format&fit=crop&w=1200&q=80'
-  },
-  {
-    id: 'ad-hd-01',
-    name: 'Moletom Adidas Street',
-    brand: 'Adidas',
-    category: 'Moletom',
-    price: 289.9,
-    description: 'Moletom com interior felpado, visual urbano e acabamento premium para dias frios.',
-    image: 'https://images.unsplash.com/photo-1512436991641-6745cdb1723f?auto=format&fit=crop&w=1200&q=80'
-  },
-  {
-    id: 'lc-pol-01',
-    name: 'Polo Lacoste Classic',
-    brand: 'Lacoste',
-    category: 'Camiseta',
-    price: 349.9,
-    description: 'Polo clássica com tecido respirável e toque refinado para compor looks elegantes.',
-    image: 'https://images.unsplash.com/photo-1521572163474-6864f9cf17ab?auto=format&fit=crop&w=1200&q=80'
-  }
-];
+app.use(cors());
+app.use(express.json());
 
-function authAdmin(req, res, next) {
+const db = await initDatabase();
+await seedDatabase(db, ADMIN_EMAIL, ADMIN_PASSWORD);
+
+async function authAdmin(req, res, next) {
   const token = req.headers.authorization?.replace('Bearer ', '');
-  if (!token || !adminSessions.has(token)) {
+  if (!token) {
     return res.status(401).json({ message: 'Não autorizado.' });
   }
-  req.admin = adminSessions.get(token);
+
+  const session = await db.get('SELECT token, email, created_at FROM admin_sessions WHERE token = ?', token);
+  if (!session) {
+    return res.status(401).json({ message: 'Não autorizado.' });
+  }
+
+  req.admin = session;
   return next();
 }
 
@@ -64,24 +41,36 @@ app.get('/api/health', (_req, res) => {
   res.json({ status: 'ok', now: new Date().toISOString() });
 });
 
-app.get('/api/products', (_req, res) => {
+app.get('/api/products', async (_req, res) => {
+  const products = await db.all('SELECT * FROM products ORDER BY rowid DESC');
   res.json({ products });
 });
 
-app.post('/api/admin/login', (req, res) => {
+app.post('/api/admin/login', async (req, res) => {
   const { email, password } = req.body;
 
-  if (email !== ADMIN_EMAIL || password !== ADMIN_PASSWORD) {
+  const admin = await db.get('SELECT email FROM admin_users WHERE email = ? AND password = ?', email, password);
+  if (!admin) {
     return res.status(401).json({ message: 'Credenciais inválidas.' });
   }
 
   const token = randomUUID();
-  adminSessions.set(token, { email, createdAt: new Date().toISOString() });
+  await db.run('INSERT INTO admin_sessions (token, email, created_at) VALUES (?, ?, ?)', token, email, new Date().toISOString());
 
   return res.json({ token, email });
 });
 
-app.post('/api/admin/products', authAdmin, (req, res) => {
+app.post('/api/admin/logout', async (req, res) => {
+  const token = req.headers.authorization?.replace('Bearer ', '');
+  if (!token) {
+    return res.status(400).json({ message: 'Token não informado.' });
+  }
+
+  await db.run('DELETE FROM admin_sessions WHERE token = ?', token);
+  return res.json({ status: 'ok' });
+});
+
+app.post('/api/admin/products', authAdmin, async (req, res) => {
   const { name, brand, category, price, description, image } = req.body;
 
   if (!name || !brand || !category || !price || !description || !image) {
@@ -98,36 +87,56 @@ app.post('/api/admin/products', authAdmin, (req, res) => {
     image
   };
 
-  products.unshift(product);
+  await db.run(
+    'INSERT INTO products (id, name, brand, category, price, description, image) VALUES (?, ?, ?, ?, ?, ?, ?)',
+    product.id,
+    product.name,
+    product.brand,
+    product.category,
+    product.price,
+    product.description,
+    product.image
+  );
+
   return res.status(201).json({ product });
 });
 
-app.put('/api/admin/products/:id', authAdmin, (req, res) => {
+app.put('/api/admin/products/:id', authAdmin, async (req, res) => {
   const { id } = req.params;
-  const index = products.findIndex((item) => item.id === id);
+  const current = await db.get('SELECT * FROM products WHERE id = ?', id);
 
-  if (index === -1) {
+  if (!current) {
     return res.status(404).json({ message: 'Produto não encontrado.' });
   }
 
-  products[index] = {
-    ...products[index],
+  const updated = {
+    ...current,
     ...req.body,
-    price: Number(req.body.price ?? products[index].price)
+    price: Number(req.body.price ?? current.price)
   };
 
-  return res.json({ product: products[index] });
+  await db.run(
+    'UPDATE products SET name = ?, brand = ?, category = ?, price = ?, description = ?, image = ? WHERE id = ?',
+    updated.name,
+    updated.brand,
+    updated.category,
+    updated.price,
+    updated.description,
+    updated.image,
+    id
+  );
+
+  return res.json({ product: updated });
 });
 
-app.delete('/api/admin/products/:id', authAdmin, (req, res) => {
+app.delete('/api/admin/products/:id', authAdmin, async (req, res) => {
   const { id } = req.params;
-  const index = products.findIndex((item) => item.id === id);
+  const result = await db.run('DELETE FROM products WHERE id = ?', id);
 
-  if (index === -1) {
+  if (result.changes === 0) {
     return res.status(404).json({ message: 'Produto não encontrado.' });
   }
 
-  products.splice(index, 1);
   return res.status(204).send();
 });
 
@@ -135,7 +144,7 @@ app.get('/api/payments/options', (_req, res) => {
   res.json({ methods });
 });
 
-app.post('/api/payments/create', (req, res) => {
+app.post('/api/payments/create', async (req, res) => {
   const { amount, customer, items, payment } = req.body;
 
   if (!amount || !customer || !items?.length || !payment?.method) {
@@ -143,51 +152,45 @@ app.post('/api/payments/create', (req, res) => {
   }
 
   const paymentId = randomUUID();
-  const payload = {
-    amount,
-    customer,
-    items,
-    payment,
-    status: 'pending',
-    createdAt: new Date().toISOString()
-  };
+  let pixKey = null;
+  let qrCodeImage = null;
 
-  let pixKey;
-  let qrCodeImage;
   if (payment.method === 'pix') {
     pixKey = `pix-${paymentId.slice(0, 8)}-${Date.now()}`;
     qrCodeImage = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(pixKey)}`;
   }
 
-  payments.set(paymentId, payload);
-
-  return res.json({
+  await db.run(
+    `INSERT INTO payments
+    (payment_id, amount, customer_json, items_json, payment_json, status, pix_key, qr_code_image, created_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     paymentId,
-    status: 'pending',
+    Number(amount),
+    JSON.stringify(customer),
+    JSON.stringify(items),
+    JSON.stringify(payment),
+    'pending',
     pixKey,
-    qrCodeImage
-  });
+    qrCodeImage,
+    new Date().toISOString()
+  );
+
+  return res.json({ paymentId, status: 'pending', pixKey, qrCodeImage });
 });
 
-app.post('/api/payments/confirm', (req, res) => {
+app.post('/api/payments/confirm', async (req, res) => {
   const { paymentId } = req.body;
+  const payment = await db.get('SELECT payment_id FROM payments WHERE payment_id = ?', paymentId);
 
-  if (!payments.has(paymentId)) {
+  if (!payment) {
     return res.status(404).json({ status: 'not_found' });
   }
 
-  const payment = payments.get(paymentId);
-  const updated = {
-    ...payment,
-    status: 'paid',
-    paidAt: new Date().toISOString()
-  };
-
-  payments.set(paymentId, updated);
+  await db.run('UPDATE payments SET status = ?, paid_at = ? WHERE payment_id = ?', 'paid', new Date().toISOString(), paymentId);
 
   return res.json({ status: 'paid', paymentId });
 });
 
 app.listen(port, () => {
-  console.log(`API de pagamentos mock rodando em http://localhost:${port}`);
+  console.log(`API com SQLite rodando em http://localhost:${port}`);
 });

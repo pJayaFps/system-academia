@@ -6,6 +6,7 @@ Loja de roupas online com visual premium, checkout por etapas e finalização au
 
 - Frontend: React + Vite + Tailwind CSS
 - Backend: Node.js + Express
+- Banco de dados local: SQLite (`.sqlite`)
 - Pagamento: API mock com Pix, débito, crédito e PayPal
 - Checkout: catálogo → carrinho → dados do cliente → pagamento → confirmação
 - Admin: login em página separada + botão de sair + CRUD completo de produtos (adicionar, editar, remover)
@@ -45,7 +46,17 @@ VITE_WHATSAPP_NUMBER=5511999999999
 ```env
 ADMIN_EMAIL=admin@atelieprime.com
 ADMIN_PASSWORD=123456
+DB_PATH=./server/data/store.sqlite
 ```
+
+## Banco de dados local (SQLite)
+
+Todos os dados agora ficam no banco local (`DB_PATH`):
+
+- produtos
+- usuários admin (login/senha)
+- sessões de admin (token)
+- pagamentos (cliente, itens, forma de pagamento, status)
 
 ## Fluxo implementado
 
@@ -60,6 +71,7 @@ ADMIN_PASSWORD=123456
 
 - `GET /api/products`
 - `POST /api/admin/login`
+- `POST /api/admin/logout`
 - `POST /api/admin/products`
 - `PUT /api/admin/products/:id`
 - `DELETE /api/admin/products/:id`

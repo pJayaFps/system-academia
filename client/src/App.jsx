@@ -70,7 +70,13 @@ function App() {
       .catch(() => setError('Não foi possível carregar métodos de pagamento.'));
   }, []);
 
-  function logoutAdmin() {
+  async function logoutAdmin() {
+    if (adminToken) {
+      await fetch(`${API_URL}/api/admin/logout`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${adminToken}` }
+      }).catch(() => null);
+    }
     setAdminToken('');
     setStep('catalogo');
   }
