@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { AdminLogin } from './components/AdminLogin';
 import { AdminPanel } from './components/AdminPanel';
 import { FilterTabs } from './components/FilterTabs';
+import { MegaMenuNav } from './components/MegaMenuNav';
 import { ProductCard } from './components/ProductCard';
 import { ProductDetailsModal } from './components/ProductDetailsModal';
 import { StepIndicator } from './components/StepIndicator';
@@ -47,14 +48,21 @@ function App() {
   const [adminToken, setAdminToken] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [menuFilter, setMenuFilter] = useState({ menu: '', item: '' });
 
   const filteredProducts = useMemo(() => {
     return catalog.filter((product) => {
       const matchesBrand = activeBrand === 'Todos' || product.brand === activeBrand;
       const matchesCategory = activeCategory === 'Todas' || product.category === activeCategory;
-      return matchesBrand && matchesCategory;
+      const normalizedItem = menuFilter.item.toLowerCase();
+      const menuMatch =
+        !menuFilter.item ||
+        product.type?.toLowerCase() === normalizedItem ||
+        product.category?.toLowerCase() === normalizedItem ||
+        product.audience?.toLowerCase() === menuFilter.menu.toLowerCase();
+      return matchesBrand && matchesCategory && menuMatch;
     });
-  }, [catalog, activeBrand, activeCategory]);
+  }, [catalog, activeBrand, activeCategory, menuFilter]);
 
   const total = useMemo(() => cart.reduce((acc, item) => acc + item.price * item.quantity, 0), [cart]);
 
@@ -283,6 +291,13 @@ function App() {
         </div>
       </header>
 
+      <MegaMenuNav
+        onSelect={({ menu, item }) => {
+          setMenuFilter({ menu, item });
+          setStep('catalogo');
+        }}
+      />
+
       <StepIndicator step={step} />
 
       {step === 'catalogo' && (
@@ -295,6 +310,13 @@ function App() {
             setActiveBrand={setActiveBrand}
             setActiveCategory={setActiveCategory}
           />
+
+          {menuFilter.item && (
+            <div className="flex items-center justify-between rounded-xl border border-zinc-800 bg-zinc-900/60 px-3 py-2">
+              <p className="text-sm text-zinc-200">Filtro do menu: <span className="font-semibold text-accent">{menuFilter.menu} / {menuFilter.item}</span></p>
+              <button onClick={() => setMenuFilter({ menu: '', item: '' })} className="text-xs text-zinc-400 hover:text-white">Limpar</button>
+            </div>
+          )}
 
           <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
             {filteredProducts.map((product) => (

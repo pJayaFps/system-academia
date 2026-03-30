@@ -71,9 +71,9 @@ app.post('/api/admin/logout', async (req, res) => {
 });
 
 app.post('/api/admin/products', authAdmin, async (req, res) => {
-  const { name, brand, category, price, description, image } = req.body;
+  const { name, brand, category, price, description, audience, type, image } = req.body;
 
-  if (!name || !brand || !category || !price || !description || !image) {
+  if (!name || !brand || !category || !price || !description || !audience || !type || !image) {
     return res.status(400).json({ message: 'Preencha todos os campos do produto.' });
   }
 
@@ -84,17 +84,21 @@ app.post('/api/admin/products', authAdmin, async (req, res) => {
     category,
     price: Number(price),
     description,
+    audience,
+    type,
     image
   };
 
   await db.run(
-    'INSERT INTO products (id, name, brand, category, price, description, image) VALUES (?, ?, ?, ?, ?, ?, ?)',
+    'INSERT INTO products (id, name, brand, category, price, description, audience, type, image) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
     product.id,
     product.name,
     product.brand,
     product.category,
     product.price,
     product.description,
+    product.audience,
+    product.type,
     product.image
   );
 
@@ -116,12 +120,14 @@ app.put('/api/admin/products/:id', authAdmin, async (req, res) => {
   };
 
   await db.run(
-    'UPDATE products SET name = ?, brand = ?, category = ?, price = ?, description = ?, image = ? WHERE id = ?',
+    'UPDATE products SET name = ?, brand = ?, category = ?, price = ?, description = ?, audience = ?, type = ?, image = ? WHERE id = ?',
     updated.name,
     updated.brand,
     updated.category,
     updated.price,
     updated.description,
+    updated.audience,
+    updated.type,
     updated.image,
     id
   );

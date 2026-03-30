@@ -60,7 +60,7 @@ Todos os dados agora ficam no banco local (`DB_PATH`):
 
 ## Fluxo implementado
 
-1. Catálogo com filtros e modal de detalhes do produto
+1. Catálogo com filtros, menu de departamentos (hover) e modal de detalhes do produto
 2. Carrinho em página separada
 3. Página de dados do cliente
 4. Página de forma de pagamento (Pix, débito, crédito, PayPal)

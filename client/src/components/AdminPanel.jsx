@@ -6,6 +6,8 @@ const initialForm = {
   category: '',
   price: '',
   description: '',
+  audience: '',
+  type: '',
   image: ''
 };
 
@@ -35,6 +37,8 @@ export function AdminPanel({ products, onCreate, onUpdate, onDelete, loading }) 
         <input className="rounded-lg bg-zinc-950 p-2" placeholder="Categoria" value={form.category} onChange={(e) => setForm((c) => ({ ...c, category: e.target.value }))} required />
         <input type="number" step="0.01" className="rounded-lg bg-zinc-950 p-2" placeholder="Preço" value={form.price} onChange={(e) => setForm((c) => ({ ...c, price: e.target.value }))} required />
         <input className="rounded-lg bg-zinc-950 p-2 sm:col-span-2" placeholder="Descrição" value={form.description} onChange={(e) => setForm((c) => ({ ...c, description: e.target.value }))} required />
+        <input className="rounded-lg bg-zinc-950 p-2" placeholder="Público (Homens, Mulheres...)" value={form.audience} onChange={(e) => setForm((c) => ({ ...c, audience: e.target.value }))} required />
+        <input className="rounded-lg bg-zinc-950 p-2" placeholder="Tipo (Chinelos, Chuteiras...)" value={form.type} onChange={(e) => setForm((c) => ({ ...c, type: e.target.value }))} required />
         <input className="rounded-lg bg-zinc-950 p-2 sm:col-span-2" placeholder="URL da imagem" value={form.image} onChange={(e) => setForm((c) => ({ ...c, image: e.target.value }))} required />
         <div className="flex gap-2 sm:col-span-2">
           <button className="rounded-lg bg-accent px-3 py-2 font-semibold" disabled={loading}>
@@ -70,6 +74,8 @@ export function AdminPanel({ products, onCreate, onUpdate, onDelete, loading }) 
                     category: product.category,
                     price: product.price,
                     description: product.description,
+                    audience: product.audience || '',
+                    type: product.type || '',
                     image: product.image
                   });
                 }}
